@@ -1,0 +1,39 @@
+{
+  "name": "mtspaw",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "",
+  "bin": {
+    "mtspaw": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "lint": "tsc --noEmit && eslint .",
+    "lint:fix": "eslint . --fix",
+    "prepare": "husky"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.5.0",
+    "commitizen": "^4.3.1",
+    "cz-conventional-changelog": "^3.3.0",
+    "eslint": "^10.1.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "husky": "^9.1.7",
+    "prettier": "^3.8.1",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.58.0"
+  },
+  "dependencies": {
+    "commander": "^14.0.3"
+  },
+  "config": {
+    "commitizen": {
+      "path": "cz-conventional-changelog"
+    }
+  }
+}
