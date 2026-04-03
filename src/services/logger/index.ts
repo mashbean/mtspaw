@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-const MAX_LINES = 300
+const MAX_LINES = 100
 const LOG_FILE = 'action.log'
 let loggerInitialized = false
 

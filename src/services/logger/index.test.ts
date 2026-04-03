@@ -39,8 +39,8 @@ describe('logger service', () => {
     expect(written).toMatch(/^\[\d{4}-\d{2}-\d{2}T/)
   })
 
-  it('rotates when exceeding 300 lines', () => {
-    const lines = Array.from({ length: 310 }, (_, i) => `line ${i}`)
+  it('rotates when exceeding 100 lines', () => {
+    const lines = Array.from({ length: 110 }, (_, i) => `line ${i}`)
     vi.mocked(fs.existsSync).mockReturnValue(true)
     vi.mocked(fs.statSync).mockReturnValue({ size: 999999 } as fs.Stats)
     vi.mocked(fs.readFileSync).mockReturnValue(lines.join('\n'))
@@ -52,10 +52,10 @@ describe('logger service', () => {
     expect(fs.writeFileSync).toHaveBeenCalled()
     const written = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string
     const writtenLines = written.split('\n').filter((l) => l.length > 0)
-    expect(writtenLines.length).toBe(300)
+    expect(writtenLines.length).toBe(100)
   })
 
-  it('does not rotate when under 300 lines', () => {
+  it('does not rotate when under 100 lines', () => {
     vi.mocked(fs.existsSync).mockReturnValue(true)
     vi.mocked(fs.statSync).mockReturnValue({ size: 100 } as fs.Stats)
     vi.mocked(fs.appendFileSync).mockReturnValue(undefined)
