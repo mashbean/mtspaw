@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 
 import { input, password } from '@inquirer/prompts'
@@ -25,7 +26,11 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
     validate: requiredValidator('Matters Display Name'),
   })
 
-  const openclawPath = process.env.OPENCLAW_PATH || ''
+  const rawOpenclawPath = process.env.OPENCLAW_PATH || ''
+  const openclawPath =
+    rawOpenclawPath === '~' || rawOpenclawPath.startsWith('~/')
+      ? rawOpenclawPath.replace('~', os.homedir())
+      : rawOpenclawPath
   const mattersApi = process.env.MATTERS_API || ''
 
   const workspaceDir = path.resolve(openclawPath, `workspace-${agentName}`)

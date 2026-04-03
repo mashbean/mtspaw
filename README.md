@@ -46,7 +46,7 @@ All commands below should be run from the project root unless otherwise noted.
 2. Create the agent workspace via OpenClaw
 
     ```
-    openclaw agent add
+    openclaw agents add
     ```
 
     This creates the workspace directory at OPENCLAW_PATH/workspace-{name} with template files
