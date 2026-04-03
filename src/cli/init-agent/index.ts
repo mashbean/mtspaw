@@ -29,7 +29,10 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
   const mattersApi = process.env.MATTERS_API || ''
 
   const workspaceDir = path.resolve(openclawPath, `workspace-${agentName}`)
-  fs.mkdirSync(workspaceDir, { recursive: true })
+
+  if (!fs.existsSync(workspaceDir)) {
+    fs.mkdirSync(workspaceDir, { recursive: true })
+  }
 
   const envJson = {
     openclawPath,
@@ -45,11 +48,7 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
   }
   fs.writeFileSync(path.join(workspaceDir, 'env.json'), JSON.stringify(envJson, null, 2))
 
-  fs.writeFileSync(path.join(workspaceDir, 'AGENTS.md'), '')
-  fs.writeFileSync(path.join(workspaceDir, 'SOUL.md'), '')
-  fs.writeFileSync(path.join(workspaceDir, 'TOOLS.md'), '')
-
-  console.log(`Created workspace: ${workspaceDir}`)
+  console.log(`Initialized workspace: ${workspaceDir}`)
 })
 
 export { initAgentCommand }
