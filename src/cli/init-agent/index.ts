@@ -53,7 +53,7 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
   }
   fs.writeFileSync(path.join(workspaceDir, 'env.json'), JSON.stringify(envJson, null, 2))
 
-  const playbooksSrc = path.resolve(import.meta.dirname, '../../playbooks')
+  const playbooksSrc = path.resolve(import.meta.dirname, '../../../src/playbooks')
   const playbooksDest = path.join(workspaceDir, 'playbooks')
 
   if (!fs.existsSync(playbooksDest)) {
