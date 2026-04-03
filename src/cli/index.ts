@@ -13,7 +13,7 @@ process.on('SIGINT', () => {
 dotenv.config({ path: path.resolve(import.meta.dirname, '../../.env'), quiet: true })
 setupConsoleLogger()
 import pkg from '../../package.json' with { type: 'json' }
-import { logAction, setQuietMode, setupConsoleLogger } from '../services/logger/index.js'
+import { logAction, setFileLogging, setQuietMode, setupConsoleLogger } from '../services/logger/index.js'
 import { envCommand } from './env/index.js'
 import { featureCommand } from './feature/index.js'
 import { helloCommand } from './hello/index.js'
@@ -86,9 +86,14 @@ program.hook('preAction', (thisCommand, actionCommand) => {
 })
 
 program.addHelpText('after', () => {
-  console.log('\nAll commands and options:\n')
-  for (const cmd of program.commands) {
-    printFullHelp(cmd)
+  setFileLogging(false)
+  try {
+    console.log('\nAll commands and options:\n')
+    for (const cmd of program.commands) {
+      printFullHelp(cmd)
+    }
+  } finally {
+    setFileLogging(true)
   }
   return ''
 })

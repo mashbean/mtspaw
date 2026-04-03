@@ -42,9 +42,14 @@ const logAction = (command: string, args: string[]) => {
 }
 
 let quietMode = false
+let fileLogging = true
 
 const setQuietMode = (enabled: boolean) => {
   quietMode = enabled
+}
+
+const setFileLogging = (enabled: boolean) => {
+  fileLogging = enabled
 }
 
 const setupConsoleLogger = () => {
@@ -60,20 +65,25 @@ const setupConsoleLogger = () => {
     if (!quietMode) {
       originalLog(...args)
     }
-    appendToLog(...args)
+    if (fileLogging) {
+      appendToLog(...args)
+    }
   }
 
   console.error = (...args: unknown[]) => {
     if (!quietMode) {
       originalError(...args)
     }
-    appendToLog('[ERROR]', ...args)
+    if (fileLogging) {
+      appendToLog('[ERROR]', ...args)
+    }
   }
 }
 
 const resetLogger = () => {
   loggerInitialized = false
   quietMode = false
+  fileLogging = true
 }
 
-export { logAction, resetLogger, setQuietMode, setupConsoleLogger }
+export { logAction, resetLogger, setFileLogging, setQuietMode, setupConsoleLogger }

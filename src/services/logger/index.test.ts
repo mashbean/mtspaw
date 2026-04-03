@@ -2,7 +2,7 @@ import fs from 'node:fs'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { logAction, resetLogger, setQuietMode, setupConsoleLogger } from './index.js'
+import { logAction, resetLogger, setFileLogging, setQuietMode, setupConsoleLogger } from './index.js'
 
 vi.mock('node:fs')
 
@@ -101,6 +101,20 @@ describe('logger service', () => {
       expect(fs.appendFileSync).toHaveBeenCalledWith('/test/action.log', 'quiet message\n')
 
       setQuietMode(false)
+      console.log = originalLog
+    })
+
+    it('file logging disabled skips writing to log file', () => {
+      vi.mocked(fs.appendFileSync).mockReturnValue(undefined)
+      const originalLog = console.log
+
+      setupConsoleLogger()
+      setFileLogging(false)
+      console.log('not logged')
+
+      expect(fs.appendFileSync).not.toHaveBeenCalled()
+
+      setFileLogging(true)
       console.log = originalLog
     })
   })
