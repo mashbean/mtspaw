@@ -10,7 +10,7 @@ Prerequisites: Node.js (ES2024 compatible), pnpm
 1. Install dependencies
 
     ```
-    pnpm install --frozen-lockfile
+    pnpm install
     ```
 
 2. Build the project
