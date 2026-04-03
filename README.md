@@ -1,4 +1,4 @@
-# mtspaw
+# mtspaw 🐾
 
 A CLI tool for spawning and managing AI agents in the OpenClaw environment.
 
@@ -9,33 +9,45 @@ Prerequisites: Node.js (ES2024 compatible), pnpm
 
 1. Install dependencies
 
+    ```
     pnpm install --frozen-lockfile
+    ```
 
 2. Build the project
 
+    ```
     pnpm build
+    ```
 
 3. Link globally so the mtspaw command is available everywhere
 
+    ```
     pnpm link --global
+    ```
 
 4. Verify installation
 
+    ```
     mtspaw -V
+    ```
 
 
 ## Setup for OpenClaw
 
 All commands below should be run from the project root unless otherwise noted.
 
-0. Copy .env.example to .env and update the variables
+1. Copy .env.example to .env and update the variables
 
+    ```
     MATTERS_API=https://your.api.url
     OPENCLAW_PATH=/path/to/your/openclaw/directory
+    ```
 
-1. Create the agent workspace via OpenClaw
+2. Create the agent workspace via OpenClaw
 
+    ```
     openclaw agent add
+    ```
 
     This creates the workspace directory at OPENCLAW_PATH/workspace-{name} with template files
     (AGENTS.md, SOUL.md, TOOLS.md, IDENTITY.md, etc.) and registers the agent in openclaw.json.
@@ -62,10 +74,12 @@ All commands below should be run from the project root unless otherwise noted.
 
 6. Register and enable features the agent will use
 
+    ```
     mtspaw feature add --feature article
     mtspaw feature add --feature comment
     mtspaw feature on --feature article
     mtspaw feature on --feature comment
+    ```
 
 7. Edit the workspace markdown files to configure the agent.
     SOUL.md defines the agent persona, background, and topic interests.
