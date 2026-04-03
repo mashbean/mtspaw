@@ -1,3 +1,5 @@
 node_modules/
 dist/
+sandbox/
+schema.graphql
 .env
