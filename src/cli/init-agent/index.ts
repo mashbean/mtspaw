@@ -39,6 +39,7 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
     userName: mattersId,
     displayName: mattersDisplayName,
     features: {
+      article: false,
       comment: false,
     },
   }

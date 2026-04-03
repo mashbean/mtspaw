@@ -202,8 +202,155 @@ const articleCommentCommand = new Command('article-comment')
     }
   })
 
+const CAMPAIGN_QUERY = `
+  query Campaign($input: CampaignInput!) {
+    campaign(input: $input) {
+      id
+      ... on WritingChallenge {
+        name
+      }
+    }
+  }
+`
+
+const PUT_DRAFT_MUTATION = `
+  mutation PutDraft($input: PutDraftInput!) {
+    putDraft(input: $input) {
+      id
+    }
+  }
+`
+
+const PUBLISH_ARTICLE_MUTATION = `
+  mutation PublishArticle($input: PublishArticleInput!) {
+    publishArticle(input: $input) {
+      id
+      article {
+        id
+        shortHash
+        title
+      }
+    }
+  }
+`
+
+const resolveEventId = async (mattersApi: string, shortHash: string) => {
+  const result = await fetchGql(mattersApi, CAMPAIGN_QUERY, { input: { shortHash } })
+
+  if (result?.errors) {
+    throw new Error(result.errors.map((e: { message: string }) => e.message).join(', '))
+  }
+
+  if (!result?.data?.campaign) {
+    throw new Error(`Event not found for shortHash: ${shortHash}`)
+  }
+
+  console.log(`Resolved event: ${result.data.campaign.name} (${result.data.campaign.id})`)
+  return result.data.campaign.id as string
+}
+
+const articleCommand = new Command('article')
+  .description('Post a new article')
+  .option('--title <text>', 'Article title')
+  .option('--content <text>', 'Article content')
+  .option('--eventId <id>', 'Submit to event (campaign ID)')
+  .option('--eventShortHash <hash>', 'Submit to event (campaign short hash)')
+  .action(async (opts) => {
+    const envJsonPath = path.resolve(process.cwd(), 'env.json')
+
+    if (!fs.existsSync(envJsonPath)) {
+      console.error('env.json not found in current directory')
+      process.exit(1)
+    }
+
+    const envJson = readEnvJson(envJsonPath)
+    const params = { ...opts }
+
+    if (!params.title) {
+      params.title = await input({
+        message: 'Article title:',
+        validate: (val) => {
+          if (!val.trim()) {
+            return 'Title is required'
+          }
+          return true
+        },
+      })
+    }
+
+    if (!params.content) {
+      params.content = await input({
+        message: 'Article content:',
+        validate: (val) => {
+          if (!val.trim()) {
+            return 'Content is required'
+          }
+          return true
+        },
+      })
+    }
+
+    if (params.eventShortHash) {
+      params.eventId = await resolveEventId(envJson.mattersApi, params.eventShortHash)
+    }
+
+    try {
+      const token = await ensureAuth(envJsonPath)
+
+      const draftInput: Record<string, unknown> = {
+        title: params.title,
+        content: params.content,
+      }
+
+      if (params.eventId) {
+        draftInput.campaigns = [{ campaign: params.eventId }]
+      }
+
+      const draftResult = await fetchGql(envJson.mattersApi, PUT_DRAFT_MUTATION, { input: draftInput }, token)
+
+      if (draftResult?.errors) {
+        console.error(
+          'Draft creation failed:',
+          draftResult.errors.map((e: { message: string }) => e.message).join(', '),
+        )
+        process.exit(1)
+      }
+
+      const draftId = draftResult?.data?.putDraft?.id
+      if (!draftId) {
+        console.error('Draft creation failed: no draft ID returned')
+        process.exit(1)
+      }
+
+      console.log(`Draft created: ${draftId}`)
+
+      const publishResult = await fetchGql(
+        envJson.mattersApi,
+        PUBLISH_ARTICLE_MUTATION,
+        { input: { id: draftId } },
+        token,
+      )
+
+      if (publishResult?.errors) {
+        console.error('Publish failed:', publishResult.errors.map((e: { message: string }) => e.message).join(', '))
+        process.exit(1)
+      }
+
+      const article = publishResult?.data?.publishArticle?.article
+      if (article) {
+        console.log(`Article published: ${article.title} (${article.shortHash})`)
+      } else {
+        console.log('Article published (pending IPFS)')
+      }
+    } catch (err) {
+      console.error('Post failed:', (err as Error).message)
+      process.exit(1)
+    }
+  })
+
 const postCommand = new Command('post').description('Post content to Matters')
 
 postCommand.addCommand(articleCommentCommand)
+postCommand.addCommand(articleCommand)
 
 export { postCommand }

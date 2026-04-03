@@ -9,14 +9,15 @@ vi.mock('../../services/auth/index.js', () => ({
 }))
 vi.mock('@inquirer/prompts', () => ({
   select: vi.fn(),
+  input: vi.fn(),
 }))
 
 import { select } from '@inquirer/prompts'
 
 import { readEnvJson, writeEnvJson } from '../../services/auth/index.js'
-import { agentCommand } from './index.js'
+import { featureCommand } from './index.js'
 
-describe('agent command', () => {
+describe('feature command', () => {
   beforeEach(() => {
     vi.spyOn(process, 'cwd').mockReturnValue('/test')
     vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -35,7 +36,7 @@ describe('agent command', () => {
     it('turns on a feature via --feature flag', async () => {
       vi.mocked(readEnvJson).mockReturnValue({ features: { comment: false } })
 
-      await agentCommand.parseAsync(['on', '--feature', 'comment'], { from: 'user' })
+      await featureCommand.parseAsync(['on', '--feature', 'comment'], { from: 'user' })
 
       expect(writeEnvJson).toHaveBeenCalledWith('/test/env.json', { features: { comment: true } })
       expect(console.log).toHaveBeenCalledWith('Feature "comment" is now on')
@@ -45,7 +46,7 @@ describe('agent command', () => {
       vi.mocked(readEnvJson).mockReturnValue({ features: { comment: false } })
       vi.mocked(select).mockResolvedValue('comment')
 
-      await agentCommand.parseAsync(['on'], { from: 'user' })
+      await featureCommand.parseAsync(['on'], { from: 'user' })
 
       expect(writeEnvJson).toHaveBeenCalledWith('/test/env.json', { features: { comment: true } })
     })
@@ -53,7 +54,7 @@ describe('agent command', () => {
     it('exits on unknown feature', async () => {
       vi.mocked(readEnvJson).mockReturnValue({ features: { comment: false } })
 
-      await expect(agentCommand.parseAsync(['on', '--feature', 'unknown'], { from: 'user' })).rejects.toThrow(
+      await expect(featureCommand.parseAsync(['on', '--feature', 'unknown'], { from: 'user' })).rejects.toThrow(
         'process.exit',
       )
       expect(console.error).toHaveBeenCalledWith('Unknown feature: unknown')
@@ -64,7 +65,7 @@ describe('agent command', () => {
     it('turns off a feature via --feature flag', async () => {
       vi.mocked(readEnvJson).mockReturnValue({ features: { comment: true } })
 
-      await agentCommand.parseAsync(['off', '--feature', 'comment'], { from: 'user' })
+      await featureCommand.parseAsync(['off', '--feature', 'comment'], { from: 'user' })
 
       expect(writeEnvJson).toHaveBeenCalledWith('/test/env.json', { features: { comment: false } })
       expect(console.log).toHaveBeenCalledWith('Feature "comment" is now off')
@@ -74,9 +75,51 @@ describe('agent command', () => {
       vi.mocked(readEnvJson).mockReturnValue({ features: { comment: true } })
       vi.mocked(select).mockResolvedValue('comment')
 
-      await agentCommand.parseAsync(['off'], { from: 'user' })
+      await featureCommand.parseAsync(['off'], { from: 'user' })
 
       expect(writeEnvJson).toHaveBeenCalledWith('/test/env.json', { features: { comment: false } })
+    })
+  })
+
+  describe('add', () => {
+    it('adds a new feature via --feature flag', async () => {
+      vi.mocked(readEnvJson).mockReturnValue({ features: { comment: false } })
+
+      await featureCommand.parseAsync(['add', '--feature', 'article'], { from: 'user' })
+
+      expect(writeEnvJson).toHaveBeenCalledWith('/test/env.json', {
+        features: { article: false, comment: false },
+      })
+      expect(console.log).toHaveBeenCalledWith('Feature "article" added')
+    })
+
+    it('exits when feature already exists', async () => {
+      vi.mocked(readEnvJson).mockReturnValue({ features: { comment: false } })
+
+      await expect(featureCommand.parseAsync(['add', '--feature', 'comment'], { from: 'user' })).rejects.toThrow(
+        'process.exit',
+      )
+      expect(console.error).toHaveBeenCalledWith('Feature already exists: comment')
+    })
+  })
+
+  describe('remove', () => {
+    it('removes a feature via --feature flag', async () => {
+      vi.mocked(readEnvJson).mockReturnValue({ features: { article: false, comment: false } })
+
+      await featureCommand.parseAsync(['remove', '--feature', 'article'], { from: 'user' })
+
+      expect(writeEnvJson).toHaveBeenCalledWith('/test/env.json', { features: { comment: false } })
+      expect(console.log).toHaveBeenCalledWith('Feature "article" removed')
+    })
+
+    it('exits when feature not found', async () => {
+      vi.mocked(readEnvJson).mockReturnValue({ features: { comment: false } })
+
+      await expect(featureCommand.parseAsync(['remove', '--feature', 'unknown'], { from: 'user' })).rejects.toThrow(
+        'process.exit',
+      )
+      expect(console.error).toHaveBeenCalledWith('Unknown feature: unknown')
     })
   })
 })

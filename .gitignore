@@ -3,3 +3,4 @@ dist/
 sandbox/
 schema.graphql
 .env
+action.log

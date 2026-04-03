@@ -14,7 +14,7 @@ dotenv.config({ path: path.resolve(import.meta.dirname, '../../.env'), quiet: tr
 setupConsoleLogger()
 import pkg from '../../package.json' with { type: 'json' }
 import { logAction, setupConsoleLogger } from '../services/logger/index.js'
-import { agentCommand } from './agent/index.js'
+import { featureCommand } from './feature/index.js'
 import { helloCommand } from './hello/index.js'
 import { initAgentCommand } from './init-agent/index.js'
 import { loginCommand } from './login/index.js'
@@ -84,7 +84,7 @@ program.addCommand(untrackCommand)
 program.addCommand(trackQueryCommand)
 program.addCommand(removeCommand)
 program.addCommand(readCommand)
-program.addCommand(agentCommand)
+program.addCommand(featureCommand)
 
 program.parseAsync(process.argv).catch((err) => {
   if (err?.name === 'ExitPromptError') {
