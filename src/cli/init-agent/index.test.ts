@@ -34,29 +34,32 @@ describe('init-agent command', () => {
     delete process.env.MATTERS_API
   })
 
-  it('writes env.json to existing workspace without mkdir', async () => {
+  it('skips mkdir and playbooks copy when workspace and playbooks exist', async () => {
     vi.mocked(fs.existsSync).mockReturnValue(true)
 
     await initAgentCommand.parseAsync([], { from: 'user' })
 
     expect(fs.mkdirSync).not.toHaveBeenCalled()
+    expect(fs.copyFileSync).not.toHaveBeenCalled()
     expect(fs.writeFileSync).toHaveBeenCalledWith(
       '/test/sandbox/workspace-test-agent/env.json',
       expect.stringContaining('"email": "test@test.com"'),
     )
-    expect(fs.writeFileSync).toHaveBeenCalledWith(
-      '/test/sandbox/workspace-test-agent/env.json',
-      expect.stringContaining('"features"'),
-    )
   })
 
-  it('creates workspace directory when it does not exist', async () => {
+  it('creates workspace and copies playbooks when they do not exist', async () => {
     vi.mocked(fs.existsSync).mockReturnValue(false)
     vi.mocked(fs.mkdirSync).mockReturnValue(undefined)
+    vi.mocked(fs.readdirSync).mockReturnValue(['post-article.md', 'track-and-post-comment.md'] as unknown as ReturnType<
+      typeof fs.readdirSync
+    >)
+    vi.mocked(fs.copyFileSync).mockReturnValue(undefined)
 
     await initAgentCommand.parseAsync([], { from: 'user' })
 
     expect(fs.mkdirSync).toHaveBeenCalledWith('/test/sandbox/workspace-test-agent', { recursive: true })
+    expect(fs.mkdirSync).toHaveBeenCalledWith('/test/sandbox/workspace-test-agent/playbooks', { recursive: true })
+    expect(fs.copyFileSync).toHaveBeenCalledTimes(2)
     expect(fs.writeFileSync).toHaveBeenCalledWith(
       '/test/sandbox/workspace-test-agent/env.json',
       expect.stringContaining('"email": "test@test.com"'),
