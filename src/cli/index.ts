@@ -79,9 +79,10 @@ program.hook('preAction', (thisCommand, actionCommand) => {
   const commandPath = getCommandPath(actionCommand)
   const rawArgs = actionCommand.args || []
   const actionOpts = actionCommand.opts()
+  const omitFromLog = ['content']
   const optArgs = Object.entries(actionOpts)
     .filter(([, v]) => v !== undefined)
-    .map(([k, v]) => `--${k} ${v}`)
+    .map(([k, v]) => (omitFromLog.includes(k) ? `--${k} [omitted]` : `--${k} ${v}`))
   logAction(commandPath, [...rawArgs, ...optArgs])
 })
 
