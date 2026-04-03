@@ -16,7 +16,6 @@ const CAMPAIGN_ARTICLES_QUERY = `
         edges {
           node {
             id
-            title
             shortHash
             comments(input: { first: 0 }) {
               totalCount
@@ -36,7 +35,6 @@ const CHANNEL_ARTICLES_QUERY = `
           edges {
             node {
               id
-              title
               shortHash
               comments(input: { first: 0 }) {
                 totalCount
@@ -172,7 +170,6 @@ const trackQueryCommand = new Command('track-query')
         collectedArticles.push({
           articleId: article.id,
           articleDbId,
-          title: article.title,
           shortHash: article.shortHash,
           eventIds: [event.id],
           channelIds: [],
@@ -223,7 +220,6 @@ const trackQueryCommand = new Command('track-query')
         collectedArticles.push({
           articleId: article.id,
           articleDbId,
-          title: article.title,
           shortHash: article.shortHash,
           eventIds: [],
           channelIds: [channel.id],

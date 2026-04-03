@@ -13,7 +13,7 @@ process.on('SIGINT', () => {
 dotenv.config({ path: path.resolve(import.meta.dirname, '../../.env'), quiet: true })
 setupConsoleLogger()
 import pkg from '../../package.json' with { type: 'json' }
-import { logAction, setupConsoleLogger } from '../services/logger/index.js'
+import { logAction, setQuietMode, setupConsoleLogger } from '../services/logger/index.js'
 import { featureCommand } from './feature/index.js'
 import { helloCommand } from './hello/index.js'
 import { initAgentCommand } from './init-agent/index.js'
@@ -28,19 +28,27 @@ import { untrackCommand } from './untrack/index.js'
 
 const program = new Command()
 
-const printFullHelp = (cmd: Command, prefix = '') => {
-  const name = prefix ? `${prefix} ${cmd.name()}` : cmd.name()
+let isFirstTopLevel = true
+
+const printFullHelp = (cmd: Command, depth = 0) => {
+  const indent = '  '.repeat(depth + 1)
   const opts = cmd.options.filter((o) => !o.hidden && o.long !== '--help' && o.long !== '--version')
   const desc = cmd.description()
+  const optStr = opts.length > 0 ? `  [${opts.map((o) => o.flags).join(', ')}]` : ''
 
   if (desc) {
-    const optStr = opts.map((o) => o.flags).join(', ')
-    console.log(`  ${name}${optStr ? `  [${optStr}]` : ''}`)
-    console.log(`    ${desc}`)
+    if (depth === 0 && !isFirstTopLevel) {
+      console.log('')
+    }
+    if (depth === 0) {
+      isFirstTopLevel = false
+    }
+    const name = depth === 0 ? `\x1b[38;2;189;147;249m${cmd.name()}\x1b[0m` : cmd.name()
+    console.log(`${indent}${name}${optStr} -- ${desc}`)
   }
 
   for (const sub of cmd.commands) {
-    printFullHelp(sub, name)
+    printFullHelp(sub, depth + 1)
   }
 }
 
@@ -54,13 +62,23 @@ const getCommandPath = (cmd: Command): string => {
   return parts.join(' ')
 }
 
-program.name(pkg.name).version(pkg.version).description('A CLI tool for spawning agents').showSuggestionAfterError(true)
+program
+  .name(pkg.name)
+  .version(pkg.version)
+  .description('A CLI tool for spawning agents')
+  .showSuggestionAfterError(true)
+  .option('-q, --quiet', 'Suppress terminal output (still logs to action.log)')
 
-program.hook('preAction', (_, actionCommand) => {
+program.hook('preAction', (thisCommand, actionCommand) => {
+  const opts = thisCommand.opts()
+  if (opts.quiet) {
+    setQuietMode(true)
+  }
+
   const commandPath = getCommandPath(actionCommand)
   const rawArgs = actionCommand.args || []
-  const opts = actionCommand.opts()
-  const optArgs = Object.entries(opts)
+  const actionOpts = actionCommand.opts()
+  const optArgs = Object.entries(actionOpts)
     .filter(([, v]) => v !== undefined)
     .map(([k, v]) => `--${k} ${v}`)
   logAction(commandPath, [...rawArgs, ...optArgs])
@@ -74,17 +92,17 @@ program.addHelpText('after', () => {
   return ''
 })
 
+program.addCommand(featureCommand)
 program.addCommand(helloCommand)
 program.addCommand(initAgentCommand)
-program.addCommand(syncSchemaCommand)
 program.addCommand(loginCommand)
 program.addCommand(postCommand)
-program.addCommand(trackCommand)
-program.addCommand(untrackCommand)
-program.addCommand(trackQueryCommand)
-program.addCommand(removeCommand)
 program.addCommand(readCommand)
-program.addCommand(featureCommand)
+program.addCommand(removeCommand)
+program.addCommand(syncSchemaCommand)
+program.addCommand(trackCommand)
+program.addCommand(trackQueryCommand)
+program.addCommand(untrackCommand)
 
 program.parseAsync(process.argv).catch((err) => {
   if (err?.name === 'ExitPromptError') {

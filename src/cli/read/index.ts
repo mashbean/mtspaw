@@ -47,6 +47,7 @@ const articleCommand = new Command('article')
   .description('Read an article content')
   .option('--id <id>', 'Article ID')
   .option('--shortHash <hash>', 'Article short hash (from URL)')
+  .option('--maxLength <chars>', 'Max content length in characters', '5000')
   .action(async (opts) => {
     const envJsonPath = path.resolve(process.cwd(), 'env.json')
 
@@ -105,11 +106,18 @@ const articleCommand = new Command('article')
       process.exit(1)
     }
 
+    const maxLength = parseInt(params.maxLength, 10)
+    const markdown = article.contents.markdown as string
+    const truncated = maxLength > 0 && markdown.length > maxLength
+
     console.log(`Title: ${article.title}`)
     console.log(`Author: ${article.author?.displayName} (@${article.author?.userName})`)
     console.log(`Hash: ${article.shortHash}`)
     console.log('---')
-    console.log(article.contents.markdown)
+    console.log(truncated ? markdown.slice(0, maxLength) : markdown)
+    if (truncated) {
+      console.log(`\n... (truncated, ${markdown.length} total chars)`)
+    }
   })
 
 const readCommand = new Command('read').description('Read content from Matters')

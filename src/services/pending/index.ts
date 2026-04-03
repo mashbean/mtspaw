@@ -4,7 +4,6 @@ import path from 'node:path'
 interface PendingArticle {
   articleId: string
   articleDbId: number
-  title: string
   shortHash: string
   eventIds: string[]
   channelIds: string[]

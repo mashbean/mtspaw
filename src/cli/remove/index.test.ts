@@ -27,8 +27,8 @@ describe('remove pending command', () => {
   it('removes article by id', async () => {
     vi.mocked(readPendingJson).mockReturnValue({
       articles: [
-        { articleId: 'a1', articleDbId: 1, title: 'Article 1', shortHash: 'h1', eventIds: [], channelIds: ['c1'] },
-        { articleId: 'a2', articleDbId: 2, title: 'Article 2', shortHash: 'h2', eventIds: [], channelIds: ['c1'] },
+        { articleId: 'a1', articleDbId: 1, shortHash: 'h1', eventIds: [], channelIds: ['c1'] },
+        { articleId: 'a2', articleDbId: 2, shortHash: 'h2', eventIds: [], channelIds: ['c1'] },
       ],
       articleLast: 2,
     })
@@ -36,9 +36,7 @@ describe('remove pending command', () => {
     await removeCommand.parseAsync(['pending', '--articleId', 'a1'], { from: 'user' })
 
     expect(writePendingJson).toHaveBeenCalledWith({
-      articles: [
-        { articleId: 'a2', articleDbId: 2, title: 'Article 2', shortHash: 'h2', eventIds: [], channelIds: ['c1'] },
-      ],
+      articles: [{ articleId: 'a2', articleDbId: 2, shortHash: 'h2', eventIds: [], channelIds: ['c1'] }],
       articleLast: 2,
     })
   })

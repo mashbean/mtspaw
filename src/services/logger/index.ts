@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-const MAX_LINES = 500
+const MAX_LINES = 300
 const LOG_FILE = 'action.log'
 let loggerInitialized = false
 
@@ -41,6 +41,12 @@ const logAction = (command: string, args: string[]) => {
   rotate(logPath)
 }
 
+let quietMode = false
+
+const setQuietMode = (enabled: boolean) => {
+  quietMode = enabled
+}
+
 const setupConsoleLogger = () => {
   if (loggerInitialized) {
     return
@@ -51,14 +57,23 @@ const setupConsoleLogger = () => {
   const originalError = console.error
 
   console.log = (...args: unknown[]) => {
-    originalLog(...args)
+    if (!quietMode) {
+      originalLog(...args)
+    }
     appendToLog(...args)
   }
 
   console.error = (...args: unknown[]) => {
-    originalError(...args)
+    if (!quietMode) {
+      originalError(...args)
+    }
     appendToLog('[ERROR]', ...args)
   }
 }
 
-export { logAction, setupConsoleLogger }
+const resetLogger = () => {
+  loggerInitialized = false
+  quietMode = false
+}
+
+export { logAction, resetLogger, setQuietMode, setupConsoleLogger }

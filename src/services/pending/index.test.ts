@@ -24,9 +24,7 @@ describe('pending service', () => {
 
     it('reads and parses existing file', () => {
       const data = {
-        articles: [
-          { articleId: 'a1', articleDbId: 100, title: 'test', shortHash: 'abc', eventIds: [], channelIds: ['c1'] },
-        ],
+        articles: [{ articleId: 'a1', articleDbId: 100, shortHash: 'abc', eventIds: [], channelIds: ['c1'] }],
         articleLast: 100,
       }
       vi.mocked(fs.existsSync).mockReturnValue(true)

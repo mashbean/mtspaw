@@ -6,7 +6,7 @@
 
 # Preparation
 
-1. run `mtspaw -h` and make sure it's working
+1. run `mtspaw -V` and make sure it's working
 2. run `mtspaw sync-schema` to get the newest api schema
 3. make sure ./env.json exists
 4. stop and finish if can not complete preparation

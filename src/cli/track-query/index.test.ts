@@ -55,9 +55,7 @@ describe('track-query command', () => {
         data: {
           channel: {
             articles: {
-              edges: [
-                { node: { id: 'QXJ0aWNsZToxMDA=', title: 'Article 1', shortHash: 'h1', comments: { totalCount: 0 } } },
-              ],
+              edges: [{ node: { id: 'QXJ0aWNsZToxMDA=', shortHash: 'h1', comments: { totalCount: 0 } } }],
             },
           },
         },
@@ -71,7 +69,6 @@ describe('track-query command', () => {
         {
           articleId: 'QXJ0aWNsZToxMDA=',
           articleDbId: 100,
-          title: 'Article 1',
           shortHash: 'h1',
           eventIds: [],
           channelIds: ['c1'],
@@ -92,9 +89,7 @@ describe('track-query command', () => {
         data: {
           channel: {
             articles: {
-              edges: [
-                { node: { id: 'QXJ0aWNsZToxMDA=', title: 'Article 1', shortHash: 'h1', comments: { totalCount: 5 } } },
-              ],
+              edges: [{ node: { id: 'QXJ0aWNsZToxMDA=', shortHash: 'h1', comments: { totalCount: 5 } } }],
             },
           },
         },

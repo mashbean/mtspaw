@@ -2,7 +2,7 @@ import fs from 'node:fs'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { logAction, setupConsoleLogger } from './index.js'
+import { logAction, resetLogger, setQuietMode, setupConsoleLogger } from './index.js'
 
 vi.mock('node:fs')
 
@@ -14,6 +14,7 @@ describe('logger service', () => {
   afterEach(() => {
     vi.restoreAllMocks()
     vi.resetAllMocks()
+    resetLogger()
   })
 
   it('appends log line with timestamp', () => {
@@ -38,8 +39,8 @@ describe('logger service', () => {
     expect(written).toMatch(/^\[\d{4}-\d{2}-\d{2}T/)
   })
 
-  it('rotates when exceeding 500 lines', () => {
-    const lines = Array.from({ length: 510 }, (_, i) => `line ${i}`)
+  it('rotates when exceeding 300 lines', () => {
+    const lines = Array.from({ length: 310 }, (_, i) => `line ${i}`)
     vi.mocked(fs.existsSync).mockReturnValue(true)
     vi.mocked(fs.statSync).mockReturnValue({ size: 999999 } as fs.Stats)
     vi.mocked(fs.readFileSync).mockReturnValue(lines.join('\n'))
@@ -51,10 +52,10 @@ describe('logger service', () => {
     expect(fs.writeFileSync).toHaveBeenCalled()
     const written = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string
     const writtenLines = written.split('\n').filter((l) => l.length > 0)
-    expect(writtenLines.length).toBe(500)
+    expect(writtenLines.length).toBe(300)
   })
 
-  it('does not rotate when under 500 lines', () => {
+  it('does not rotate when under 300 lines', () => {
     vi.mocked(fs.existsSync).mockReturnValue(true)
     vi.mocked(fs.statSync).mockReturnValue({ size: 100 } as fs.Stats)
     vi.mocked(fs.appendFileSync).mockReturnValue(undefined)
@@ -87,6 +88,20 @@ describe('logger service', () => {
       expect(fs.appendFileSync).toHaveBeenCalledWith('/test/action.log', '[ERROR] something broke\n')
 
       console.error = originalError
+    })
+
+    it('quiet mode still logs to file', () => {
+      vi.mocked(fs.appendFileSync).mockReturnValue(undefined)
+      const originalLog = console.log
+
+      setupConsoleLogger()
+      setQuietMode(true)
+      console.log('quiet message')
+
+      expect(fs.appendFileSync).toHaveBeenCalledWith('/test/action.log', 'quiet message\n')
+
+      setQuietMode(false)
+      console.log = originalLog
     })
   })
 })
