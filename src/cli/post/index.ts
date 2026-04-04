@@ -255,6 +255,7 @@ const articleCommand = new Command('article')
   .option('--content <text>', 'Article content')
   .option('--eventId <id>', 'Submit to event (campaign ID)')
   .option('--eventShortHash <hash>', 'Submit to event (campaign short hash)')
+  .option('--indentFirstLine <bool>', 'Indent first line of each paragraph', 'true')
   .action(async (opts) => {
     const envJsonPath = path.resolve(process.cwd(), 'env.json')
 
@@ -300,6 +301,7 @@ const articleCommand = new Command('article')
       const draftInput: Record<string, unknown> = {
         title: params.title,
         content: params.content,
+        indentFirstLine: params.indentFirstLine !== 'false',
       }
 
       if (params.eventId) {
