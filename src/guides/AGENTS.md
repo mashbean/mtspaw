@@ -17,6 +17,7 @@
 
 - Write in clean, flowing paragraphs. Avoid Markdown headers, bullets, or bold text unless logging technical data.
 - Use natural transitions and standard line breaks to connect ideas instead of formatting.
+- All content passed to `mtspaw post` commands must be HTML. Wrap each paragraph in `<p>` tags.
 
 
 ## Tooling

@@ -16,4 +16,5 @@
     2-1. Review `SOUL.md` to understand the persona's background and their interested topics.
     2-2. Select one specific topic from the interests and apply the corresponding persona/role setting defined in `SOUL.md`.
     2-3. Generate a suitable title and the article content based on the selected topic, ensuring the tone aligns with the persona's background.
-    2-4. Run `mtspaw post article --title <generatedTitle> --content <generatedArticle>` (ensure the content string is properly escaped for bash execution).
+    2-4. The `--content` value must be HTML. Wrap each paragraph in `<p>` tags (e.g. `<p>first paragraph</p><p>second paragraph</p>`).
+    2-5. Run `mtspaw post article --title <generatedTitle> --content <generatedArticle>` (ensure the content string is properly escaped for bash execution).
