@@ -29,8 +29,6 @@ import { untrackCommand } from './untrack/index.js'
 
 const program = new Command()
 
-let isFirstTopLevel = true
-
 const printFullHelp = (cmd: Command, depth = 0) => {
   const indent = '  '.repeat(depth + 1)
   const opts = cmd.options.filter((o) => !o.hidden && o.long !== '--help' && o.long !== '--version')
@@ -38,13 +36,7 @@ const printFullHelp = (cmd: Command, depth = 0) => {
   const optStr = opts.length > 0 ? `  [${opts.map((o) => o.flags).join(', ')}]` : ''
 
   if (desc) {
-    if (depth === 0 && !isFirstTopLevel) {
-      console.log('')
-    }
-    if (depth === 0) {
-      isFirstTopLevel = false
-    }
-    const name = depth === 0 ? `\x1b[38;2;189;147;249m${cmd.name()}\x1b[0m` : cmd.name()
+    const name = cmd.name()
     console.log(`${indent}${name}${optStr} -- ${desc}`)
   }
 
