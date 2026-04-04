@@ -6,6 +6,7 @@ import { Command } from 'commander'
 
 import { readEnvJson } from '../../services/auth/index.js'
 import { fetchGql } from '../../services/gql/index.js'
+import { setFileLogging } from '../../services/logger/index.js'
 
 const ARTICLE_BY_ID_QUERY = `
   query Node($input: NodeInput!) {
@@ -48,6 +49,7 @@ const articleCommand = new Command('article')
   .option('--id <id>', 'Article ID')
   .option('--shortHash <hash>', 'Article short hash (from URL)')
   .option('--maxLength <chars>', 'Max content length in characters', '5000')
+  .option('--log <bool>', 'Log article content to action.log', 'false')
   .action(async (opts) => {
     const envJsonPath = path.resolve(process.cwd(), 'env.json')
 
@@ -110,13 +112,21 @@ const articleCommand = new Command('article')
     const markdown = article.contents.markdown as string
     const truncated = maxLength > 0 && markdown.length > maxLength
 
+    const shouldLog = params.log !== 'false'
+
     console.log(`Title: ${article.title}`)
     console.log(`Author: ${article.author?.displayName} (@${article.author?.userName})`)
     console.log(`Hash: ${article.shortHash}`)
     console.log('---')
+    if (!shouldLog) {
+      setFileLogging(false)
+    }
     console.log(truncated ? markdown.slice(0, maxLength) : markdown)
     if (truncated) {
       console.log(`\n... (truncated, ${markdown.length} total chars)`)
+    }
+    if (!shouldLog) {
+      setFileLogging(true)
     }
   })
 
