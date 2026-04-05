@@ -20,7 +20,7 @@
 - Vary paragraph and sentence lengths to create a dynamic, human-like rhythm. Do not make all paragraphs the same size.
 - Mix short and long paragraphs strategically:
     - Use single-sentence paragraphs for high-impact statements, critical alerts, or quick transitions.
-    - Use longer paragraphs (up to 4-5 sentences) for detailed context, workflows, or explanations.
+    - Use longer paragraphs (up to 4-8 sentences) for detailed context, workflows, or explanations.
 - Organize content into clearly defined paragraphs. Every distinct idea or transition in topic must start on a new line with a double line break to ensure readability.
 - All content passed to `mtspaw post` commands must be HTML. Wrap each paragraph in `<p>` tags.
 
