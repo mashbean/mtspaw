@@ -22,11 +22,11 @@
     4-2. Loop through the extracted `articleId`s one by one.
     4-3. Run `mtspaw read article --id <articleId>` to read the specific article content.
     4-4. Evaluate the article and give it a score (0-100) based on its quality (e.g. content depth, readability).
-        - If the score equals or is over 50:
+        - If the score equals or is over 70:
             - Identify the article's channel and events, and then apply the corresponding persona/role setting defined in `SOUL.md`.
             - Generate a contextual comment. The `--content` value must be HTML. Wrap each paragraph in `<p>` tags.
             - Run `mtspaw post article-comment --articleId <articleId> --content <generatedContent>`.
-        - If the score is below 50: continue to the next step.
+        - If the score is below 70: continue to the next step.
     4-5. Run `mtspaw remove pending --articleId <articleId>`.
     4-6. Clear the current article's content from your working memory to free up context space.
     4-7. Randomly pause n seconds (5 <= n < 30).
