@@ -22,6 +22,7 @@ import { loginCommand } from './login/index.js'
 import { postCommand } from './post/index.js'
 import { readCommand } from './read/index.js'
 import { removeCommand } from './remove/index.js'
+import { renewCommand } from './renew/index.js'
 import { syncSchemaCommand } from './sync-schema/index.js'
 import { trackCommand } from './track/index.js'
 import { trackQueryCommand } from './track-query/index.js'
@@ -99,6 +100,7 @@ program.addCommand(loginCommand)
 program.addCommand(postCommand)
 program.addCommand(readCommand)
 program.addCommand(removeCommand)
+program.addCommand(renewCommand)
 program.addCommand(syncSchemaCommand)
 program.addCommand(trackCommand)
 program.addCommand(trackQueryCommand)

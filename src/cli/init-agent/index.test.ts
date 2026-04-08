@@ -64,5 +64,9 @@ describe('init-agent command', () => {
       '/test/sandbox/workspace/test-agent/env.json',
       expect.stringContaining('"email": "test@test.com"'),
     )
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+      '/test/sandbox/workspace/test-agent/MEMORY.md',
+      expect.stringContaining('# Memory'),
+    )
   })
 })

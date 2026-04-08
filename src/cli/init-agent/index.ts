@@ -65,6 +65,16 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
     console.log(`Copied playbooks to: ${playbooksDest}`)
   }
 
+  const memoryPath = path.join(workspaceDir, 'MEMORY.md')
+  if (!fs.existsSync(memoryPath)) {
+    const memoryTemplate =
+      '# Memory\n\n' +
+      '<!-- Format: [YYYY-MM-DD HH:mm] | Summary: [2-sentence summary] -->\n' +
+      '<!-- Keep at most 8 records, newest on top. -->\n'
+    fs.writeFileSync(memoryPath, memoryTemplate)
+    console.log(`Created memory file: ${memoryPath}`)
+  }
+
   console.log(`Initialized workspace: ${workspaceDir}`)
 })
 
