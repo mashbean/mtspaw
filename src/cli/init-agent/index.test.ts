@@ -42,7 +42,7 @@ describe('init-agent command', () => {
     expect(fs.mkdirSync).not.toHaveBeenCalled()
     expect(fs.copyFileSync).not.toHaveBeenCalled()
     expect(fs.writeFileSync).toHaveBeenCalledWith(
-      '/test/sandbox/workspace-test-agent/env.json',
+      '/test/sandbox/workspace/test-agent/env.json',
       expect.stringContaining('"email": "test@test.com"'),
     )
   })
@@ -57,11 +57,11 @@ describe('init-agent command', () => {
 
     await initAgentCommand.parseAsync([], { from: 'user' })
 
-    expect(fs.mkdirSync).toHaveBeenCalledWith('/test/sandbox/workspace-test-agent', { recursive: true })
-    expect(fs.mkdirSync).toHaveBeenCalledWith('/test/sandbox/workspace-test-agent/playbooks', { recursive: true })
+    expect(fs.mkdirSync).toHaveBeenCalledWith('/test/sandbox/workspace/test-agent', { recursive: true })
+    expect(fs.mkdirSync).toHaveBeenCalledWith('/test/sandbox/workspace/test-agent/playbooks', { recursive: true })
     expect(fs.copyFileSync).toHaveBeenCalledTimes(2)
     expect(fs.writeFileSync).toHaveBeenCalledWith(
-      '/test/sandbox/workspace-test-agent/env.json',
+      '/test/sandbox/workspace/test-agent/env.json',
       expect.stringContaining('"email": "test@test.com"'),
     )
   })

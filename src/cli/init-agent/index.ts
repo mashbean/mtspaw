@@ -33,7 +33,7 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
       : rawOpenclawPath
   const mattersApi = process.env.MATTERS_API || ''
 
-  const workspaceDir = path.resolve(openclawPath, `workspace-${agentName}`)
+  const workspaceDir = path.resolve(openclawPath, `workspace/${agentName}`)
 
   if (!fs.existsSync(workspaceDir)) {
     fs.mkdirSync(workspaceDir, { recursive: true })
