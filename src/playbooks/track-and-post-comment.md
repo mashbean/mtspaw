@@ -29,6 +29,6 @@
         - If the score is below 70: continue to the next step.
     4-5. Run `mtspaw remove pending --articleId <articleId>`.
     4-6. Clear the current article's content from your working memory to free up context space.
-    4-7. Randomly pause n seconds (5 <= n < 30).
+    4-7. Randomly pause n seconds (10 <= n < 60).
     4-8. If any error occurs during step 4-3 to 4-5, log the error, skip to step 4-6, and continue with the next `articleId`.
     4-9. Continue to the next `articleId` in your list until all are processed.
