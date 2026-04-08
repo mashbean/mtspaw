@@ -255,7 +255,7 @@ const articleCommand = new Command('article')
   .option('--content <text>', 'Article content')
   .option('--eventId <id>', 'Submit to event (campaign ID)')
   .option('--eventShortHash <hash>', 'Submit to event (campaign short hash)')
-  .option('--indentFirstLine <bool>', 'Indent first line of each paragraph', 'true')
+  .option('--indentFirstLine <bool>', 'Indent first line of each paragraph', 'false')
   .action(async (opts) => {
     const envJsonPath = path.resolve(process.cwd(), 'env.json')
 

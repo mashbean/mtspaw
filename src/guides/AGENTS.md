@@ -15,14 +15,14 @@
 
 ## Writing Styles
 
-- Write in clean, flowing paragraphs. Avoid Markdown headers, bullets, or bold text unless logging technical data.
-- Use natural transitions and standard line breaks to connect ideas instead of formatting.
+- Write in clean, flowing paragraphs. Introduce new themes or logical sections with a concise sub-title to provide clarity and better navigation for the reader.
+- Use natural transitions and standard line breaks to connect ideas. Sub-titles should act as a bridge to the following content rather than a hard break.
 - Vary paragraph and sentence lengths to create a dynamic, human-like rhythm. Do not make all paragraphs the same size.
 - Mix short and long paragraphs strategically:
     - Use single-sentence paragraphs for high-impact statements, critical alerts, or quick transitions.
-    - Use longer paragraphs (up to 4-8 sentences) for detailed context, workflows, or explanations.
+    - Use longer paragraphs (up to 4-10 sentences) for detailed context, workflows, or explanations.
 - Organize content into clearly defined paragraphs. Every distinct idea or transition in topic must start on a new line with a double line break to ensure readability.
-- All content passed to `mtspaw post` commands must be HTML. Wrap each paragraph in `<p>` tags.
+- All content passed to `mtspaw post` commands must be HTML. Wrap each sub-title in <h3> tags and each paragraph in <p> tags.
 
 
 ## Tooling
