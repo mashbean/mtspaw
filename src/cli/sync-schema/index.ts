@@ -1,21 +1,15 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { select } from '@inquirer/prompts'
 import { Command } from 'commander'
 
 const SCHEMA_BASE_URL = 'https://raw.githubusercontent.com/thematters/matters-server'
 
 const syncSchemaCommand = new Command('sync-schema')
   .description('Fetch the latest GraphQL schema from matters-server')
-  .action(async () => {
-    const branch = await select({
-      message: 'Select branch:',
-      choices: [
-        { name: 'master', value: 'master' },
-        { name: 'develop', value: 'develop' },
-      ],
-    })
+  .option('--branch <name>', 'Branch to fetch schema from', 'master')
+  .action(async (opts) => {
+    const branch = opts.branch as string
 
     console.log(`Fetching schema.graphql from matters-server (${branch})...`)
 

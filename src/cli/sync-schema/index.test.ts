@@ -3,11 +3,6 @@ import fs from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('node:fs')
-vi.mock('@inquirer/prompts', () => ({
-  select: vi.fn(),
-}))
-
-import { select } from '@inquirer/prompts'
 
 import { syncSchemaCommand } from './index.js'
 
@@ -22,8 +17,7 @@ describe('sync-schema command', () => {
     vi.restoreAllMocks()
   })
 
-  it('fetches schema from selected branch and saves', async () => {
-    vi.mocked(select).mockResolvedValue('master')
+  it('defaults to master branch when --branch is not provided', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       text: () => Promise.resolve('type Query { hello: String }'),
@@ -37,8 +31,20 @@ describe('sync-schema command', () => {
     expect(fs.writeFileSync).toHaveBeenCalledWith(expect.stringContaining('schema.graphql'), expect.any(String))
   })
 
+  it('uses provided --branch value', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('type Query { hello: String }'),
+    } as Response)
+
+    await syncSchemaCommand.parseAsync(['--branch', 'develop'], { from: 'user' })
+
+    expect(fetch).toHaveBeenCalledWith(
+      'https://raw.githubusercontent.com/thematters/matters-server/develop/schema.graphql',
+    )
+  })
+
   it('exits on fetch failure', async () => {
-    vi.mocked(select).mockResolvedValue('develop')
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: false,
       status: 404,

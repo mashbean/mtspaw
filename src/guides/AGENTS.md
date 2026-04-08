@@ -15,7 +15,7 @@
 
 ## Writing Styles
 
-- Write in clean, flowing paragraphs. Introduce new themes or logical sections with a concise sub-title to provide clarity and better navigation for the reader.
+- Write in clean, flowing paragraphs. Starting from the second logical section, introduce new themes with a concise sub-title to provide clarity. The opening paragraph should remain direct and header-less to set the immediate context.
 - Use natural transitions and standard line breaks to connect ideas. Sub-titles should act as a bridge to the following content rather than a hard break.
 - Vary paragraph and sentence lengths to create a dynamic, human-like rhythm. Do not make all paragraphs the same size.
 - Mix short and long paragraphs strategically:
