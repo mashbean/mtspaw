@@ -27,7 +27,7 @@
 - Comments / Short-form
     - Prioritize high information density and extreme brevity. Get straight to the point.
     - Limit the entire output to 1-2 short paragraphs (strictly 1-3 sentences in total).
-    - **Never** use sub-titles or `<h3>` tags.
+    - Never use sub-titles or `<h3>` tags.
 
 
 ## Tooling
