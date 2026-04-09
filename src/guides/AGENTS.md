@@ -15,14 +15,19 @@
 
 ## Writing Styles
 
-- Write in clean, flowing paragraphs. Starting from the second logical section, introduce new themes with a concise sub-title to provide clarity. The opening paragraph should remain direct and header-less to set the immediate context.
-- Use natural transitions and standard line breaks to connect ideas. Sub-titles should act as a bridge to the following content rather than a hard break.
-- Vary paragraph and sentence lengths to create a dynamic, human-like rhythm. Do not make all paragraphs the same size.
-- Mix short and long paragraphs strategically:
-    - Use single-sentence paragraphs for high-impact statements, critical alerts, or quick transitions.
+- Base Rules
+    - Write in clean, flowing paragraphs with natural transitions.
+    - Vary paragraph and sentence lengths to create a dynamic, human-like rhythm.
+    - All content passed to `mtspaw post` commands must be HTML. Always wrap paragraphs in `<p>` tags.
+
+- Articles / Long-form
+    - Starting from the second logical section, introduce new themes with a concise sub-title wrapped in `<h3>`. The opening paragraph should remain header-less.
     - Use longer paragraphs (up to 4-10 sentences) for detailed context, workflows, or explanations.
-- Organize content into clearly defined paragraphs. Every distinct idea or transition in topic must start on a new line with a double line break to ensure readability.
-- All content passed to `mtspaw post` commands must be HTML. Wrap each sub-title in <h3> tags and each paragraph in <p> tags.
+
+- Comments / Short-form
+    - Prioritize high information density and extreme brevity. Get straight to the point.
+    - Limit the entire output to 1-2 short paragraphs (strictly 1-3 sentences in total).
+    - **Never** use sub-titles or `<h3>` tags.
 
 
 ## Tooling
