@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import { input, password } from '@inquirer/prompts'
+import { checkbox, input, password } from '@inquirer/prompts'
 import { Command } from 'commander'
 
 const requiredValidator = (label: string) => (val: string) => {
@@ -24,6 +24,13 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
   const mattersDisplayName = await input({
     message: 'Matters Display Name:',
     validate: requiredValidator('Matters Display Name'),
+  })
+  const enabledFeatures = await checkbox({
+    message: 'Enable features (space to toggle, enter to confirm):',
+    choices: [
+      { name: 'article', value: 'article' },
+      { name: 'comment', value: 'comment' },
+    ],
   })
 
   const rawOpenclawPath = process.env.OPENCLAW_PATH || ''
@@ -47,8 +54,8 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
     userName: mattersId,
     displayName: mattersDisplayName,
     features: {
-      article: false,
-      comment: false,
+      article: enabledFeatures.includes('article'),
+      comment: enabledFeatures.includes('comment'),
     },
   }
   fs.writeFileSync(path.join(workspaceDir, 'env.json'), JSON.stringify(envJson, null, 2))

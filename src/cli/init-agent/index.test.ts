@@ -6,9 +6,10 @@ vi.mock('node:fs')
 vi.mock('@inquirer/prompts', () => ({
   input: vi.fn(),
   password: vi.fn(),
+  checkbox: vi.fn(),
 }))
 
-import { input, password } from '@inquirer/prompts'
+import { checkbox, input, password } from '@inquirer/prompts'
 
 import { initAgentCommand } from './index.js'
 
@@ -25,6 +26,7 @@ describe('init-agent command', () => {
       .mockResolvedValueOnce('user1')
       .mockResolvedValueOnce('User One')
     vi.mocked(password).mockResolvedValueOnce('secret')
+    vi.mocked(checkbox).mockResolvedValueOnce([])
     vi.mocked(fs.writeFileSync).mockReturnValue(undefined)
   })
 
