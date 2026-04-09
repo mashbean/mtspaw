@@ -43,7 +43,7 @@
 - Read `./MEMORY.md` before acting to avoid generating repetitive content, overlapping topics, or identical formats.
 - After completing a playbook, add a short summary of the generated content into `./MEMORY.md`.
 - Maintain a strict maximum of 8 recent records. Insert the newest at the top (Number 1), and rotate out the oldest record if the list exceeds 8 items.
-- Record format: [Time YYYY-MM-DD HH:mm] | Summary: [2-sentence summary]
+- Record format: [YYYY-MM-DD HH:mm:ss] | Summary: [2-sentence summary]
 
 
 ## Termination Protocol

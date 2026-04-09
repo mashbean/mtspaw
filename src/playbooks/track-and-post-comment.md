@@ -28,7 +28,7 @@
             - Run `mtspaw post article-comment --articleId <articleId> --content <generatedContent>`.
         - If the score is below 70: continue to the next step.
     4-5. Run `mtspaw remove pending --articleId <articleId>`.
-    4-6. Clear the current article's content from your working memory to free up context space.
-    4-7. Randomly pause n seconds (10 <= n < 60).
+    4-6. Clear the current article's content from your working memory to free up context space, but keep a rolling log of your last 5 generated comments in your short-term memory. Before generating the next comment in step 4-4, review this log to actively avoid repeating the same sentence structures, vocabulary, or opening phrases.
+    4-7. Randomly pause n seconds (30 <= n < 180).
     4-8. If any error occurs during step 4-3 to 4-5, log the error, skip to step 4-6, and continue with the next `articleId`.
     4-9. Continue to the next `articleId` in your list until all are processed.
