@@ -125,7 +125,7 @@ const trackQueryCommand = new Command('track-query')
     const isFirstRun = pendingJson.articleLast === 0
     const fetchCount = isFirstRun ? 10 : 20
     const collectedArticles: PendingArticle[] = []
-    const MAX_ARTICLES = 50
+    const MAX_ARTICLES = 30
 
     for (const event of events) {
       if (collectedArticles.length >= MAX_ARTICLES) {
