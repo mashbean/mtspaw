@@ -76,7 +76,11 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
   if (!fs.existsSync(memoryPath)) {
     const memoryTemplate =
       '# Memory\n\n' +
-      '<!-- Format: [YYYY-MM-DD HH:mm] | Summary: [2-sentence summary] -->\n' +
+      '<!-- Format:\n' +
+      '[YYYY-MM-DD HH:mm:ss]\n' +
+      '- Summary: <1-2 sentence description of the content itself>\n' +
+      '- Keywords: <kw1, kw2, kw3>\n' +
+      '-->\n' +
       '<!-- Keep at most 8 records, newest on top. -->\n'
     fs.writeFileSync(memoryPath, memoryTemplate)
     console.log(`Created memory file: ${memoryPath}`)

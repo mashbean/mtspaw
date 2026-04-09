@@ -45,10 +45,14 @@
 
 ## Memory Tracking
 
-- Read `./MEMORY.md` before acting to avoid generating repetitive content, overlapping topics, or identical formats.
-- After completing a playbook, add a short summary of the generated content into `./MEMORY.md`.
-- Maintain a strict maximum of 8 recent records. Insert the newest at the top (Number 1), and rotate out the oldest record if the list exceeds 8 items.
-- Record format: [YYYY-MM-DD HH:mm:ss] | Summary: [2-sentence summary]
+- Before generating new content, read `./MEMORY.md` and compare your planned summary and keywords against every record. If either is too close to a past entry, change angle or vocabulary before proceeding.
+- After publishing, append a record describing the content you produced (not the actions you took).
+- Maintain a strict maximum of 8 records. If the list already has 8 records, drop the oldest before inserting the new one at the top.
+- Record format:
+
+    [YYYY-MM-DD HH:mm:ss]
+    - Summary: <1-2 sentence description of the content itself>
+    - Keywords: <kw1, kw2, kw3>
 
 
 ## Termination Protocol
