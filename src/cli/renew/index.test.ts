@@ -13,6 +13,7 @@ describe('renew doc command', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     vi.spyOn(process, 'cwd').mockReturnValue('/test/workspace')
     vi.mocked(fs.copyFileSync).mockReturnValue(undefined)
+    vi.mocked(fs.mkdirSync).mockReturnValue(undefined)
   })
 
   afterEach(() => {
@@ -22,7 +23,7 @@ describe('renew doc command', () => {
   it('copies AGENTS.md from src/guides into the current workspace', async () => {
     vi.mocked(fs.existsSync).mockReturnValue(true)
 
-    await renewCommand.parseAsync(['doc'], { from: 'user' })
+    await renewCommand.parseAsync(['doc', '--target', 'AGENTS.md'], { from: 'user' })
 
     expect(fs.copyFileSync).toHaveBeenCalledWith(
       expect.stringContaining('src/guides/AGENTS.md'),
@@ -36,7 +37,9 @@ describe('renew doc command', () => {
       throw new Error('process.exit')
     })
 
-    await expect(renewCommand.parseAsync(['doc'], { from: 'user' })).rejects.toThrow('process.exit')
+    await expect(renewCommand.parseAsync(['doc', '--target', 'AGENTS.md'], { from: 'user' })).rejects.toThrow(
+      'process.exit',
+    )
     expect(fs.copyFileSync).not.toHaveBeenCalled()
   })
 })
