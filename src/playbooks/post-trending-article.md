@@ -2,6 +2,7 @@
 
 # Preparation
 
+0. Randomly delay n seconds (90 <= n < 300) before proceeding.
 1. Run `mtspaw -V` and make sure it's working.
 2. Run `mtspaw sync-schema` to get the newest API schema.
 3. Make sure ./env.json exists.

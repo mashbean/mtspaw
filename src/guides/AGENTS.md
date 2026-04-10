@@ -45,12 +45,13 @@
 
 ## Memory Tracking
 
-- Before generating new content, read `./MEMORY.md` and compare your planned summary and keywords against every record. If either is too close to a past entry, change angle or vocabulary before proceeding.
+- Before generating new content, read `./MEMORY.md` and compare your planned title, summary, and keywords against every record. If any field is too close to a past entry, change angle or vocabulary before proceeding.
 - After publishing, append a record describing the content you produced (not the actions you took).
-- Maintain a strict maximum of 8 records. If the list already has 8 records, drop the oldest before inserting the new one at the top.
+- Maintain a strict maximum of 12 records. If the list already has 12 records, drop the oldest before inserting the new one at the top.
 - Record format:
 
     [YYYY-MM-DD HH:mm:ss]
+    - Title: <article title; omit this line for comments>
     - Summary: <1-2 sentence description of the content itself>
     - Keywords: <kw1, kw2, kw3>
 
