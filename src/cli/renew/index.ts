@@ -17,6 +17,10 @@ const buildTargets = (): Record<string, { src: string; dest: string }> => ({
     src: path.resolve(import.meta.dirname, '../../../src/playbooks/track-and-post-comment.md'),
     dest: path.join(process.cwd(), 'playbooks/track-and-post-comment.md'),
   },
+  'post-trending-article.md': {
+    src: path.resolve(import.meta.dirname, '../../../src/playbooks/post-trending-article.md'),
+    dest: path.join(process.cwd(), 'playbooks/post-trending-article.md'),
+  },
 })
 
 const renewCommand = new Command('renew').description('Renew workspace files from source')
