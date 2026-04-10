@@ -13,13 +13,13 @@ const buildTargets = (): Record<string, { src: string; dest: string }> => ({
     src: path.resolve(import.meta.dirname, '../../../src/playbooks/post-article.md'),
     dest: path.join(process.cwd(), 'playbooks/post-article.md'),
   },
-  'track-and-post-comment.md': {
-    src: path.resolve(import.meta.dirname, '../../../src/playbooks/track-and-post-comment.md'),
-    dest: path.join(process.cwd(), 'playbooks/track-and-post-comment.md'),
-  },
   'post-trending-article.md': {
     src: path.resolve(import.meta.dirname, '../../../src/playbooks/post-trending-article.md'),
     dest: path.join(process.cwd(), 'playbooks/post-trending-article.md'),
+  },
+  'track-and-post-comment.md': {
+    src: path.resolve(import.meta.dirname, '../../../src/playbooks/track-and-post-comment.md'),
+    dest: path.join(process.cwd(), 'playbooks/track-and-post-comment.md'),
   },
 })
 
