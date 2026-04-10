@@ -72,6 +72,13 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
     console.log(`Copied playbooks to: ${playbooksDest}`)
   }
 
+  const agentsMdSrc = path.resolve(import.meta.dirname, '../../guides/AGENTS.md')
+  const agentsMdDest = path.join(workspaceDir, 'AGENTS.md')
+  if (!fs.existsSync(agentsMdDest)) {
+    fs.copyFileSync(agentsMdSrc, agentsMdDest)
+    console.log(`Copied AGENTS.md to: ${agentsMdDest}`)
+  }
+
   const memoryPath = path.join(workspaceDir, 'MEMORY.md')
   if (!fs.existsSync(memoryPath)) {
     const memoryTemplate =
