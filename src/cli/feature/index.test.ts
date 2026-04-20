@@ -6,6 +6,9 @@ vi.mock('node:fs')
 vi.mock('../../services/auth/index.js', () => ({
   readEnvJson: vi.fn(),
   writeEnvJson: vi.fn(),
+  requireEnvJson: vi.fn(() => '/test/env.json'),
+  sortByKey: <V>(obj: Record<string, V>) =>
+    Object.fromEntries(Object.entries(obj).sort(([a], [b]) => a.localeCompare(b))),
 }))
 vi.mock('@inquirer/prompts', () => ({
   select: vi.fn(),

@@ -6,6 +6,9 @@ vi.mock('node:fs')
 vi.mock('../../services/auth/index.js', () => ({
   readEnvJson: vi.fn(),
   writeEnvJson: vi.fn(),
+  requireEnvJson: vi.fn(() => '/test/env.json'),
+  sortByKey: <V>(obj: Record<string, V>) =>
+    Object.fromEntries(Object.entries(obj).sort(([a], [b]) => a.localeCompare(b))),
 }))
 vi.mock('@inquirer/prompts', () => ({
   select: vi.fn(),
@@ -84,7 +87,7 @@ describe('threshold command', () => {
       await expect(
         thresholdCommand.parseAsync(['set', '--name', 'comment', '--value', '101'], { from: 'user' }),
       ).rejects.toThrow('process.exit')
-      expect(console.error).toHaveBeenCalledWith('Value for "comment" must be in 0-100')
+      expect(console.error).toHaveBeenCalledWith('Value must be in 0-100')
     })
   })
 

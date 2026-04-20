@@ -1,23 +1,7 @@
-import fs from 'node:fs'
-import path from 'node:path'
-
 import { input, select } from '@inquirer/prompts'
 import { Command } from 'commander'
 
-import { readEnvJson, writeEnvJson } from '../../services/auth/index.js'
-
-const sortFeatures = (features: Record<string, boolean>) => {
-  return Object.fromEntries(Object.entries(features).sort(([a], [b]) => a.localeCompare(b)))
-}
-
-const requireEnvJson = () => {
-  const envJsonPath = path.resolve(process.cwd(), 'env.json')
-  if (!fs.existsSync(envJsonPath)) {
-    console.error('env.json not found in current directory')
-    process.exit(1)
-  }
-  return envJsonPath
-}
+import { readEnvJson, requireEnvJson, sortByKey, writeEnvJson } from '../../services/auth/index.js'
 
 const getFeatureChoices = (features: Record<string, boolean>) => {
   return Object.keys(features).map((key) => ({
@@ -73,7 +57,7 @@ const withFeature = async (
   }
 
   config.mutate(features, featureName)
-  envJson.features = sortFeatures(features)
+  envJson.features = sortByKey(features)
   writeEnvJson(envJsonPath, envJson)
   console.log(config.successMessage(featureName))
 }

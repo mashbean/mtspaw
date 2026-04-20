@@ -1,28 +1,28 @@
-import fs from 'node:fs'
-import path from 'node:path'
-
 import { input, select } from '@inquirer/prompts'
 import { Command } from 'commander'
 
-import { readEnvJson, writeEnvJson } from '../../services/auth/index.js'
+import { readEnvJson, requireEnvJson, sortByKey, writeEnvJson } from '../../services/auth/index.js'
 
 const KNOWN_THRESHOLDS = ['comment'] as const
+type ThresholdName = (typeof KNOWN_THRESHOLDS)[number]
 
-const RANGES: Record<string, { min: number; max: number }> = {
+const RANGES: Record<ThresholdName, { min: number; max: number }> = {
   comment: { min: 0, max: 100 },
 }
 
-const sortThresholds = (thresholds: Record<string, number>) => {
-  return Object.fromEntries(Object.entries(thresholds).sort(([a], [b]) => a.localeCompare(b)))
+const isKnownThreshold = (name: string): name is ThresholdName => {
+  return (KNOWN_THRESHOLDS as readonly string[]).includes(name)
 }
 
-const requireEnvJson = () => {
-  const envJsonPath = path.resolve(process.cwd(), 'env.json')
-  if (!fs.existsSync(envJsonPath)) {
-    console.error('env.json not found in current directory')
-    process.exit(1)
+const validateValue = (raw: string, range: { min: number; max: number }): string | true => {
+  const n = Number(raw)
+  if (!Number.isInteger(n)) {
+    return 'Value must be an integer'
   }
-  return envJsonPath
+  if (n < range.min || n > range.max) {
+    return `Value must be in ${range.min}-${range.max}`
+  }
+  return true
 }
 
 const setCommand = new Command('set')
@@ -42,7 +42,7 @@ const setCommand = new Command('set')
       })
     }
 
-    if (!KNOWN_THRESHOLDS.includes(name as (typeof KNOWN_THRESHOLDS)[number])) {
+    if (!isKnownThreshold(name)) {
       console.error(`Unknown threshold: ${name}`)
       console.error(`Available: ${KNOWN_THRESHOLDS.join(', ')}`)
       process.exit(1)
@@ -53,33 +53,20 @@ const setCommand = new Command('set')
     if (rawValue === undefined) {
       rawValue = await input({
         message: `Value (${range.min}-${range.max}):`,
-        validate: (val) => {
-          const n = Number(val)
-          if (!Number.isInteger(n)) {
-            return 'Value must be an integer'
-          }
-          if (n < range.min || n > range.max) {
-            return `Value must be in ${range.min}-${range.max}`
-          }
-          return true
-        },
+        validate: (val) => validateValue(val, range),
       })
+    } else {
+      const result = validateValue(rawValue, range)
+      if (result !== true) {
+        console.error(result)
+        process.exit(1)
+      }
     }
 
-    const value = Number(rawValue)
-    if (!Number.isInteger(value)) {
-      console.error('Value must be an integer')
-      process.exit(1)
-    }
-    if (value < range.min || value > range.max) {
-      console.error(`Value for "${name}" must be in ${range.min}-${range.max}`)
-      process.exit(1)
-    }
-
-    thresholds[name] = value
-    envJson.thresholds = sortThresholds(thresholds)
+    thresholds[name] = Number(rawValue)
+    envJson.thresholds = sortByKey(thresholds)
     writeEnvJson(envJsonPath, envJson)
-    console.log(`Threshold "${name}" set to ${value}`)
+    console.log(`Threshold "${name}" set to ${thresholds[name]}`)
   })
 
 const listCommand = new Command('list').description('List all thresholds').action(() => {

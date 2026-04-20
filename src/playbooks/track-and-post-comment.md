@@ -27,7 +27,12 @@
         - If the score >= THRESHOLD:
             - Identify the article's channel and events, and then apply the corresponding persona/role setting defined in `SOUL.md`.
             - Generate a contextual comment. The `--content` value must be HTML. Wrap each paragraph in `<p>` tags.
-            - Run `mtspaw post article-comment --articleId <articleId> --content <generatedContent>`.
+            - Before posting, compute the Chinese character ratio of the generated comment:
+                - Strip HTML tags and whitespace from the content to get the plain text.
+                - Count characters in these Unicode ranges as Chinese: U+4E00-U+9FFF (漢字), U+3000-U+303F (中文標點), U+FF00-U+FFEF (全形符號).
+                - ratio = chinese_count / total_character_count (after stripping HTML and whitespace).
+            - If ratio < 0.25: skip posting this comment. Log the reason and continue to step 4-5.
+            - Otherwise: Run `mtspaw post article-comment --articleId <articleId> --content <generatedContent>`.
         - If the score < THRESHOLD: continue to the next step.
     4-5. Run `mtspaw remove pending --articleId <articleId>`.
     4-6. Clear the current article's content from your working memory to free up context space, but keep a rolling log of your last 5 generated comments in your short-term memory. Before generating the next comment in step 4-4, review this log to actively avoid repeating the same sentence structures, vocabulary, or opening phrases.

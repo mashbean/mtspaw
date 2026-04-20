@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import path from 'node:path'
 
 import { fetchGql } from '../gql/index.js'
 
@@ -17,6 +18,19 @@ const readEnvJson = (envJsonPath: string) => {
 
 const writeEnvJson = (envJsonPath: string, envJson: Record<string, string>) => {
   fs.writeFileSync(envJsonPath, JSON.stringify(envJson, null, 2))
+}
+
+const requireEnvJson = () => {
+  const envJsonPath = path.resolve(process.cwd(), 'env.json')
+  if (!fs.existsSync(envJsonPath)) {
+    console.error('env.json not found in current directory')
+    process.exit(1)
+  }
+  return envJsonPath
+}
+
+const sortByKey = <V>(obj: Record<string, V>): Record<string, V> => {
+  return Object.fromEntries(Object.entries(obj).sort(([a], [b]) => a.localeCompare(b)))
 }
 
 const clearTokens = (envJsonPath: string) => {
@@ -79,4 +93,4 @@ const ensureAuth = async (envJsonPath: string) => {
   return await login(envJsonPath)
 }
 
-export { clearTokens, ensureAuth, login, readEnvJson, writeEnvJson }
+export { clearTokens, ensureAuth, login, readEnvJson, requireEnvJson, sortByKey, writeEnvJson }
