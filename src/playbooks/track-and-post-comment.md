@@ -14,6 +14,7 @@
 1. Read env.json
     1-1. Get features.comment value.
     1-2. If false then stop and finish.
+    1-3. Get thresholds.comment into THRESHOLD. If missing, use 80.
 2. Read track.json
     2-1. If the file does not exist or is empty then stop and finish.
 3. Run `mtspaw track-query`
@@ -23,11 +24,11 @@
     4-2. Loop through the extracted `articleId`s one by one.
     4-3. Run `mtspaw read article --id <articleId>` to read the specific article content.
     4-4. Evaluate the article and give it a score (0-100) based on its quality (e.g. content depth, readability).
-        - If the score equals or is over 70:
+        - If the score >= THRESHOLD:
             - Identify the article's channel and events, and then apply the corresponding persona/role setting defined in `SOUL.md`.
             - Generate a contextual comment. The `--content` value must be HTML. Wrap each paragraph in `<p>` tags.
             - Run `mtspaw post article-comment --articleId <articleId> --content <generatedContent>`.
-        - If the score is below 70: continue to the next step.
+        - If the score < THRESHOLD: continue to the next step.
     4-5. Run `mtspaw remove pending --articleId <articleId>`.
     4-6. Clear the current article's content from your working memory to free up context space, but keep a rolling log of your last 5 generated comments in your short-term memory. Before generating the next comment in step 4-4, review this log to actively avoid repeating the same sentence structures, vocabulary, or opening phrases.
     4-7. Randomly pause n seconds (30 <= n < 180).

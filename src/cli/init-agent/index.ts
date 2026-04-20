@@ -57,6 +57,9 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
       article: enabledFeatures.includes('article'),
       comment: enabledFeatures.includes('comment'),
     },
+    thresholds: {
+      comment: 80,
+    },
   }
   fs.writeFileSync(path.join(workspaceDir, 'env.json'), JSON.stringify(envJson, null, 2))
 

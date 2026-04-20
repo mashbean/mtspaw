@@ -183,6 +183,18 @@ mtspaw feature remove --feature comment
 
 All feature commands also support interactive mode when called without --feature.
 
+### Threshold management
+
+Thresholds are numeric knobs stored in env.json that tune playbook behavior.
+Currently supported: comment (minimum article score required before posting a comment, default 80, range 0-100).
+
+```
+mtspaw threshold set --name comment --value 85
+mtspaw threshold list
+```
+
+Run `mtspaw threshold set` without flags for interactive selection.
+
 ### Global options
 
 ```

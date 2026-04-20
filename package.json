@@ -1,6 +1,6 @@
 {
   "name": "mtspaw",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "type": "module",
   "description": "",
   "bin": {
@@ -42,5 +42,8 @@
     "commitizen": {
       "path": "cz-conventional-changelog"
     }
+  },
+  "pnpm": {
+    "minimumReleaseAge": 10080
   }
 }
