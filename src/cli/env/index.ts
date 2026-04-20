@@ -15,7 +15,11 @@ const envCommand = new Command('env').description('Print the current env.json').
 
   console.log(`Path: ${envJsonPath}`)
   const envJson = readEnvJson(envJsonPath)
-  const safe = { ...envJson, password: '***' }
+  const safe = {
+    ...envJson,
+    password: '***',
+    ...(envJson.wallet ? { wallet: { ...envJson.wallet, privateKey: '***' } } : {}),
+  }
   console.log(JSON.stringify(safe, null, 2))
 })
 

@@ -195,6 +195,18 @@ mtspaw threshold list
 
 Run `mtspaw threshold set` without flags for interactive selection.
 
+### Wallet management
+
+Each agent can have its own Ethereum wallet stored in env.json.
+
+```
+mtspaw wallet create
+mtspaw wallet create --force   # overwrite existing
+```
+
+The command prints the address only. The private key is stored in env.json.
+Use `mtspaw env` to view; the private key is masked.
+
 ### Global options
 
 ```

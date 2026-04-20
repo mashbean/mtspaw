@@ -28,6 +28,7 @@ import { thresholdCommand } from './threshold/index.js'
 import { trackCommand } from './track/index.js'
 import { trackQueryCommand } from './track-query/index.js'
 import { untrackCommand } from './untrack/index.js'
+import { walletCommand } from './wallet/index.js'
 
 const program = new Command()
 
@@ -73,7 +74,7 @@ program.hook('preAction', (thisCommand, actionCommand) => {
   const commandPath = getCommandPath(actionCommand)
   const rawArgs = actionCommand.args || []
   const actionOpts = actionCommand.opts()
-  const omitFromLog = ['content']
+  const omitFromLog = ['content', 'privateKey']
   const optArgs = Object.entries(actionOpts)
     .filter(([, v]) => v !== undefined)
     .map(([k, v]) => (omitFromLog.includes(k) ? `--${k} [omitted]` : `--${k} ${v}`))
@@ -107,6 +108,7 @@ program.addCommand(thresholdCommand)
 program.addCommand(trackCommand)
 program.addCommand(trackQueryCommand)
 program.addCommand(untrackCommand)
+program.addCommand(walletCommand)
 
 program.parseAsync(process.argv).catch((err) => {
   if (err?.name === 'ExitPromptError') {
