@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-import { fetchGql } from '../gql/index.js'
+import { fetchGql, formatGqlErrors } from '../gql/index.js'
 
 const LOGIN_MUTATION = `
   mutation EmailLogin($input: EmailLoginInput!) {
@@ -93,4 +93,39 @@ const ensureAuth = async (envJsonPath: string) => {
   return await login(envJsonPath)
 }
 
-export { clearTokens, ensureAuth, login, readEnvJson, requireEnvJson, sortByKey, writeEnvJson }
+const isAuthError = (message: string) => {
+  const lower = message.toLowerCase()
+  return lower.includes('token') || lower.includes('auth')
+}
+
+const fetchGqlWithAuthRetry = async (
+  envJsonPath: string,
+  mattersApi: string,
+  query: string,
+  variables: Record<string, unknown> = {},
+) => {
+  let token = await ensureAuth(envJsonPath)
+  let result = await fetchGql(mattersApi, query, variables, token)
+  let errorMessage = formatGqlErrors(result)
+
+  if (errorMessage && isAuthError(errorMessage)) {
+    console.log('Token invalid, re-logging in...')
+    token = await login(envJsonPath)
+    result = await fetchGql(mattersApi, query, variables, token)
+    errorMessage = formatGqlErrors(result)
+  }
+
+  return { result, errorMessage }
+}
+
+export {
+  clearTokens,
+  ensureAuth,
+  fetchGqlWithAuthRetry,
+  isAuthError,
+  login,
+  readEnvJson,
+  requireEnvJson,
+  sortByKey,
+  writeEnvJson,
+}

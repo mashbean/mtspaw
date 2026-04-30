@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { delay, fetchGql } from './index.js'
+import { delay, fetchGql, formatGqlErrors, fromGlobalId } from './index.js'
 
 describe('delay', () => {
   it('resolves after given ms', async () => {
@@ -61,5 +61,28 @@ describe('fetchGql', () => {
       .mockRejectedValueOnce(new Error('fail 3'))
 
     await expect(fetchGql('https://api.test', 'query {}', {})).rejects.toThrow('GQL request failed after 3 attempts')
+  })
+})
+
+describe('fromGlobalId', () => {
+  it('decodes a base64 User global id', () => {
+    const encoded = Buffer.from('User:123', 'utf-8').toString('base64')
+    expect(fromGlobalId(encoded)).toEqual({ type: 'User', id: '123' })
+  })
+
+  it('decodes an Article global id', () => {
+    const encoded = Buffer.from('Article:42', 'utf-8').toString('base64')
+    expect(fromGlobalId(encoded)).toEqual({ type: 'Article', id: '42' })
+  })
+})
+
+describe('formatGqlErrors', () => {
+  it('returns null when result has no errors', () => {
+    expect(formatGqlErrors({ data: {} })).toBe(null)
+    expect(formatGqlErrors(null)).toBe(null)
+  })
+
+  it('joins error messages with comma', () => {
+    expect(formatGqlErrors({ errors: [{ message: 'one' }, { message: 'two' }] })).toBe('one, two')
   })
 })

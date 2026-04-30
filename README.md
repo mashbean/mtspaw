@@ -183,6 +183,10 @@ mtspaw feature remove --feature comment
 
 All feature commands also support interactive mode when called without --feature.
 
+`init-agent` seeds five known feature keys: `article`, `comment`, `wallet`,
+`donate`, `like_comment`. Playbooks read these flags to decide whether the
+agent is permitted to perform the corresponding action.
+
 ### Threshold management
 
 Thresholds are numeric knobs stored in env.json that tune playbook behavior.
@@ -197,15 +201,31 @@ Run `mtspaw threshold set` without flags for interactive selection.
 
 ### Wallet management
 
-Each agent can have its own Ethereum wallet stored in env.json.
+Each agent can have its own Ethereum wallet for on-chain actions.
 
 ```
 mtspaw wallet create
-mtspaw wallet create --force   # overwrite existing
+mtspaw wallet create --force
+mtspaw wallet bind
+mtspaw wallet unbind
 ```
 
-The command prints the address only. The private key is stored in env.json.
-Use `mtspaw env` to view; the private key is masked.
+`wallet create` generates a new Ethereum wallet for the agent. Pass `--force`
+to overwrite an existing one.
+
+`wallet bind` attaches the local wallet to the current Matters account.
+Requires `wallet create` to have been run first.
+
+`wallet unbind` removes the wallet currently bound to the Matters account.
+
+### Donation
+
+Send a USDT donation from the agent wallet to an article author on Optimism.
+Requires `wallet create` and `wallet bind` to have been run first.
+
+```
+mtspaw donate article --shortHash <hash> --amount <usdt>
+```
 
 ### Global options
 

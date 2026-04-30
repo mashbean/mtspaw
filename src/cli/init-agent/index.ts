@@ -30,6 +30,9 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
     choices: [
       { name: 'article', value: 'article' },
       { name: 'comment', value: 'comment' },
+      { name: 'wallet', value: 'wallet' },
+      { name: 'donate', value: 'donate' },
+      { name: 'like_comment', value: 'like_comment' },
     ],
   })
 
@@ -53,9 +56,13 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
     password: pwd,
     userName: mattersId,
     displayName: mattersDisplayName,
+    network: 'production',
     features: {
       article: enabledFeatures.includes('article'),
       comment: enabledFeatures.includes('comment'),
+      wallet: enabledFeatures.includes('wallet'),
+      donate: enabledFeatures.includes('donate'),
+      like_comment: enabledFeatures.includes('like_comment'),
     },
     thresholds: {
       comment: 80,

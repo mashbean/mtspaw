@@ -1,6 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
+import { fromGlobalId } from '../gql/index.js'
+
 interface PendingArticle {
   articleId: string
   articleDbId: number
@@ -29,12 +31,12 @@ const writePendingJson = (pendingJson: PendingJson) => {
 }
 
 const decodeArticleDbId = (articleId: string): number => {
-  const decoded = Buffer.from(articleId, 'base64').toString('utf-8')
-  const match = decoded.match(/(\d+)$/)
-  if (!match) {
+  const { id } = fromGlobalId(articleId)
+  const dbId = parseInt(id, 10)
+  if (Number.isNaN(dbId)) {
     throw new Error(`Cannot decode DB id from article id: ${articleId}`)
   }
-  return parseInt(match[1], 10)
+  return dbId
 }
 
 export { decodeArticleDbId, readPendingJson, writePendingJson }

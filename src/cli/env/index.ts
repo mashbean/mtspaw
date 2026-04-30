@@ -18,7 +18,6 @@ const envCommand = new Command('env').description('Print the current env.json').
   const safe = {
     ...envJson,
     password: '***',
-    ...(envJson.wallet ? { wallet: { ...envJson.wallet, privateKey: '***' } } : {}),
   }
   console.log(JSON.stringify(safe, null, 2))
 })

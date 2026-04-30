@@ -28,4 +28,17 @@ const fetchGql = async (mattersApi: string, query: string, variables: Record<str
   }
 }
 
-export { delay, fetchGql }
+const fromGlobalId = (globalId: string) => {
+  const [type, id] = Buffer.from(globalId, 'base64').toString('utf-8').split(':')
+  return { type, id }
+}
+
+const formatGqlErrors = (result: unknown): string | null => {
+  const errors = (result as { errors?: { message: string }[] } | null)?.errors
+  if (!errors || errors.length === 0) {
+    return null
+  }
+  return errors.map((e) => e.message).join(', ')
+}
+
+export { delay, fetchGql, formatGqlErrors, fromGlobalId }

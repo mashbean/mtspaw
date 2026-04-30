@@ -14,6 +14,7 @@ dotenv.config({ path: path.resolve(import.meta.dirname, '../../.env'), quiet: tr
 setupConsoleLogger()
 import pkg from '../../package.json' with { type: 'json' }
 import { logAction, setFileLogging, setQuietMode, setupConsoleLogger } from '../services/logger/index.js'
+import { donateCommand } from './donate/index.js'
 import { envCommand } from './env/index.js'
 import { featureCommand } from './feature/index.js'
 import { helloCommand } from './hello/index.js'
@@ -94,6 +95,7 @@ program.addHelpText('after', () => {
   return ''
 })
 
+program.addCommand(donateCommand)
 program.addCommand(envCommand)
 program.addCommand(featureCommand)
 program.addCommand(helloCommand)
