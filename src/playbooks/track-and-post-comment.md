@@ -20,11 +20,13 @@
 3. Run `mtspaw track-query`
     3-1. If pending.json does not exist then stop and finish.
 4. Read pending.json
-    4-1. Access the `articles` array, and extract only the `articleId` list into your memory (do not fetch full article contents at this step).
-    4-2. Loop through the extracted `articleId`s one by one.
+    4-1. From the `articles` array, extract `articleId` and `shortHash` for each entry into memory. Do not fetch article contents at this step.
+    4-2. Loop through the extracted articles one by one.
     4-3. Run `mtspaw read article --id <articleId>` to read the specific article content.
     4-4. Evaluate the article and give it a score (0-100) based on its quality (e.g. content depth, readability).
         - If the score >= THRESHOLD:
+            - Run `mtspaw score add --articleId <articleId> --shortHash <shortHash> --score <score> --author <userName>` to record this evaluation. Take `<userName>` from the `Author:
+  <displayName> (@<userName>)` line in the step 4-3 output.
             - Identify the article's channel and events, and then apply the corresponding persona/role setting defined in `SOUL.md`.
             - Generate a contextual comment. The `--content` value must be HTML. Wrap each paragraph in `<p>` tags.
             - Before posting, compute the Chinese character ratio of the generated comment:

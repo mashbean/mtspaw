@@ -24,6 +24,7 @@ import { postCommand } from './post/index.js'
 import { readCommand } from './read/index.js'
 import { removeCommand } from './remove/index.js'
 import { renewCommand } from './renew/index.js'
+import { scoreCommand } from './score/index.js'
 import { syncSchemaCommand } from './sync-schema/index.js'
 import { thresholdCommand } from './threshold/index.js'
 import { trackCommand } from './track/index.js'
@@ -105,6 +106,7 @@ program.addCommand(postCommand)
 program.addCommand(readCommand)
 program.addCommand(removeCommand)
 program.addCommand(renewCommand)
+program.addCommand(scoreCommand)
 program.addCommand(syncSchemaCommand)
 program.addCommand(thresholdCommand)
 program.addCommand(trackCommand)
