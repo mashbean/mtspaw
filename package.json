@@ -45,6 +45,6 @@
     }
   },
   "pnpm": {
-    "minimumReleaseAge": 10080
+    "minimumReleaseAge": 20160
   }
 }
