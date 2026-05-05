@@ -1,5 +1,5 @@
 import type { Chain } from 'viem'
-import { createPublicClient, createWalletClient, http } from 'viem'
+import { createPublicClient, createWalletClient, erc20Abi, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { optimism, optimismSepolia } from 'viem/chains'
 
@@ -12,6 +12,8 @@ interface NetworkConfig {
   curationVaultAddress: `0x${string}`
   tokenDecimals: number
 }
+
+const DEFAULT_NETWORK: Network = 'production'
 
 const networks: Record<Network, NetworkConfig> = {
   production: {
@@ -28,6 +30,19 @@ const networks: Record<Network, NetworkConfig> = {
     curationVaultAddress: '0xd41be66Bf309Ce5c3949BDe5C8091edc4870c27F',
     tokenDecimals: 6,
   },
+}
+
+const isNetwork = (value: string): value is Network => {
+  return value in networks
+}
+
+const resolveNetwork = (envJson: Record<string, unknown>): Network => {
+  const raw = (envJson.network as string | undefined) ?? DEFAULT_NETWORK
+  if (!isNetwork(raw)) {
+    console.error(`Unknown network in env.json: ${raw}. Use "production" or "staging".`)
+    process.exit(1)
+  }
+  return raw
 }
 
 const toCurationVaultUID = (userId: string) => {
@@ -49,5 +64,31 @@ const getWalletClient = (network: Network, privateKey: `0x${string}`) => {
   })
 }
 
-export { getPublicClient, getWalletClient, networks, toCurationVaultUID }
+const readWalletBalances = async (
+  publicClient: ReturnType<typeof getPublicClient>,
+  config: NetworkConfig,
+  address: `0x${string}`,
+) => {
+  const [usdtBalance, ethBalance] = await Promise.all([
+    publicClient.readContract({
+      address: config.tokenAddress,
+      abi: erc20Abi,
+      functionName: 'balanceOf',
+      args: [address],
+    }),
+    publicClient.getBalance({ address }),
+  ])
+  return { usdtBalance, ethBalance }
+}
+
+export {
+  DEFAULT_NETWORK,
+  getPublicClient,
+  getWalletClient,
+  isNetwork,
+  networks,
+  readWalletBalances,
+  resolveNetwork,
+  toCurationVaultUID,
+}
 export type { Network, NetworkConfig }

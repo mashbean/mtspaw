@@ -66,6 +66,7 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
     },
     thresholds: {
       comment: 80,
+      donate: 85,
     },
   }
   fs.writeFileSync(path.join(workspaceDir, 'env.json'), JSON.stringify(envJson, null, 2))

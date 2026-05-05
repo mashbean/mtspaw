@@ -1,11 +1,13 @@
 import fs from 'node:fs'
 
 import { Command } from 'commander'
+import { formatEther, formatUnits } from 'viem'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 
-import { fetchGqlWithAuthRetry, readEnvJson, requireEnvJson } from '../../services/auth/index.js'
+import { fetchGqlWithAuthRetry, readEnvJson, requireEnvJson, requireMattersApi } from '../../services/auth/index.js'
 import { fetchGql, formatGqlErrors } from '../../services/gql/index.js'
 import { requireWallet, requireWalletJsonPath, writeWalletJson } from '../../services/wallet/index.js'
+import { getPublicClient, networks, readWalletBalances, resolveNetwork } from '../../services/web3/index.js'
 
 const GENERATE_SIGNING_MESSAGE_MUTATION = `
   mutation GenerateSigningMessage($input: GenerateSigningMessageInput!) {
@@ -34,15 +36,6 @@ const REMOVE_WALLET_LOGIN_MUTATION = `
     }
   }
 `
-
-const requireMattersApi = (envJson: Record<string, unknown>): string => {
-  const mattersApi = envJson.mattersApi
-  if (typeof mattersApi !== 'string' || !mattersApi) {
-    console.error('Missing mattersApi in env.json')
-    process.exit(1)
-  }
-  return mattersApi
-}
 
 const createCommand = new Command('create')
   .description('Create a new Ethereum wallet for this agent')
@@ -133,9 +126,31 @@ const unbindCommand = new Command('unbind')
     }
   })
 
+const balanceCommand = new Command('balance')
+  .description('Print USDT and native ETH balances on the configured network')
+  .action(async () => {
+    const envJsonPath = requireEnvJson()
+    const envJson = readEnvJson(envJsonPath)
+    const network = resolveNetwork(envJson)
+    const config = networks[network]
+    const { wallet } = requireWallet()
+
+    const publicClient = getPublicClient(network)
+
+    try {
+      const { usdtBalance, ethBalance } = await readWalletBalances(publicClient, config, wallet.address)
+      console.log(`USDT: ${formatUnits(usdtBalance, config.tokenDecimals)}`)
+      console.log(`ETH: ${formatEther(ethBalance)}`)
+    } catch (err) {
+      console.error('Balance query failed:', (err as Error).message)
+      process.exit(1)
+    }
+  })
+
 const walletCommand = new Command('wallet').description('Manage agent Ethereum wallet')
 walletCommand.addCommand(createCommand)
 walletCommand.addCommand(bindCommand)
 walletCommand.addCommand(unbindCommand)
+walletCommand.addCommand(balanceCommand)
 
 export { walletCommand }

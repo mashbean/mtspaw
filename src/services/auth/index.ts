@@ -29,6 +29,15 @@ const requireEnvJson = () => {
   return envJsonPath
 }
 
+const requireMattersApi = (envJson: Record<string, unknown>): string => {
+  const mattersApi = envJson.mattersApi
+  if (typeof mattersApi !== 'string' || !mattersApi) {
+    console.error('Missing mattersApi in env.json')
+    process.exit(1)
+  }
+  return mattersApi
+}
+
 const sortByKey = <V>(obj: Record<string, V>): Record<string, V> => {
   return Object.fromEntries(Object.entries(obj).sort(([a], [b]) => a.localeCompare(b)))
 }
@@ -126,6 +135,7 @@ export {
   login,
   readEnvJson,
   requireEnvJson,
+  requireMattersApi,
   sortByKey,
   writeEnvJson,
 }

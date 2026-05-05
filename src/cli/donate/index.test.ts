@@ -8,6 +8,7 @@ const waitForTransactionReceipt = vi.fn()
 vi.mock('../../services/auth/index.js', () => ({
   readEnvJson: vi.fn(),
   requireEnvJson: vi.fn(() => '/test/env.json'),
+  requireMattersApi: vi.fn((envJson: Record<string, unknown>) => envJson.mattersApi as string),
   fetchGqlWithAuthRetry: vi.fn(),
 }))
 vi.mock('../../services/wallet/index.js', () => ({
@@ -24,8 +25,8 @@ vi.mock('../../services/gql/index.js', () => ({
   }),
   fromGlobalId: vi.fn(() => ({ type: 'User', id: '42' })),
 }))
-vi.mock('../../services/web3/index.js', () => ({
-  networks: {
+vi.mock('../../services/web3/index.js', () => {
+  const networks = {
     production: {
       chain: { id: 10 },
       tokenAddress: '0xtoken',
@@ -40,11 +41,40 @@ vi.mock('../../services/web3/index.js', () => ({
       curationVaultAddress: '0xvaultStaging',
       tokenDecimals: 6,
     },
-  },
-  toCurationVaultUID: vi.fn((id: string) => `matters:${id}`),
-  getPublicClient: vi.fn(() => ({ readContract, getBalance, waitForTransactionReceipt })),
-  getWalletClient: vi.fn(() => ({ writeContract, account: { address: '0xagent' } })),
-}))
+  }
+  return {
+    networks,
+    toCurationVaultUID: vi.fn((id: string) => `matters:${id}`),
+    getPublicClient: vi.fn(() => ({ readContract, getBalance, waitForTransactionReceipt })),
+    getWalletClient: vi.fn(() => ({ writeContract, account: { address: '0xagent' } })),
+    resolveNetwork: vi.fn((envJson: Record<string, unknown>) => {
+      const raw = (envJson.network as string | undefined) ?? 'production'
+      if (!(raw in networks)) {
+        console.error(`Unknown network in env.json: ${raw}. Use "production" or "staging".`)
+        process.exit(1)
+      }
+      return raw
+    }),
+    readWalletBalances: vi.fn(
+      async (
+        publicClient: { readContract: typeof readContract; getBalance: typeof getBalance },
+        config: { tokenAddress: string },
+        address: string,
+      ) => {
+        const [usdtBalance, ethBalance] = await Promise.all([
+          publicClient.readContract({
+            address: config.tokenAddress,
+            abi: [],
+            functionName: 'balanceOf',
+            args: [address],
+          }),
+          publicClient.getBalance({ address }),
+        ])
+        return { usdtBalance, ethBalance }
+      },
+    ),
+  }
+})
 
 import { fetchGqlWithAuthRetry, readEnvJson } from '../../services/auth/index.js'
 import { fetchGql } from '../../services/gql/index.js'

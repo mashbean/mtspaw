@@ -53,6 +53,10 @@ describe('init-agent command', () => {
     )
     expect(fs.writeFileSync).toHaveBeenCalledWith(
       '/test/sandbox/workspace/test-agent/env.json',
+      expect.stringContaining('"donate": 85'),
+    )
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+      '/test/sandbox/workspace/test-agent/env.json',
       expect.stringContaining('"network": "production"'),
     )
     expect(fs.writeFileSync).toHaveBeenCalledWith(

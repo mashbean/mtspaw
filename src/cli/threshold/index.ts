@@ -3,11 +3,12 @@ import { Command } from 'commander'
 
 import { readEnvJson, requireEnvJson, sortByKey, writeEnvJson } from '../../services/auth/index.js'
 
-const KNOWN_THRESHOLDS = ['comment'] as const
+const KNOWN_THRESHOLDS = ['comment', 'donate'] as const
 type ThresholdName = (typeof KNOWN_THRESHOLDS)[number]
 
 const RANGES: Record<ThresholdName, { min: number; max: number }> = {
   comment: { min: 0, max: 100 },
+  donate: { min: 0, max: 100 },
 }
 
 const isKnownThreshold = (name: string): name is ThresholdName => {

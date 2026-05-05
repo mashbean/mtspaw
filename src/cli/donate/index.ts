@@ -2,13 +2,19 @@ import { input } from '@inquirer/prompts'
 import { Command } from 'commander'
 import { erc20Abi, parseUnits } from 'viem'
 
-import { fetchGqlWithAuthRetry, readEnvJson, requireEnvJson } from '../../services/auth/index.js'
+import { fetchGqlWithAuthRetry, readEnvJson, requireEnvJson, requireMattersApi } from '../../services/auth/index.js'
 import { fetchGql, formatGqlErrors, fromGlobalId } from '../../services/gql/index.js'
 import { requireWallet } from '../../services/wallet/index.js'
 import { curationAbi } from '../../services/web3/abis/curation.js'
 import { curationVaultAbi } from '../../services/web3/abis/curationVault.js'
-import type { Network } from '../../services/web3/index.js'
-import { getPublicClient, getWalletClient, networks, toCurationVaultUID } from '../../services/web3/index.js'
+import {
+  getPublicClient,
+  getWalletClient,
+  networks,
+  readWalletBalances,
+  resolveNetwork,
+  toCurationVaultUID,
+} from '../../services/web3/index.js'
 
 const ARTICLE_QUERY = `
   query Article($input: ArticleInput!) {
@@ -82,20 +88,11 @@ const validateAmount = (raw: string): string | true => {
   return true
 }
 
-const resolveNetwork = (envJson: Record<string, unknown>): Network => {
-  const raw = (envJson.network as string | undefined) ?? 'production'
-  if (!(raw in networks)) {
-    console.error(`Unknown network in env.json: ${raw}. Use "production" or "staging".`)
-    process.exit(1)
-  }
-  return raw as Network
-}
-
 const articleCommand = new Command('article')
   .description('Donate USDT to an article author on Optimism')
   .option('--shortHash <hash>', 'Article short hash (from URL)')
-  .option('--amount <usdt>', 'Amount in USDT (up to 2 decimal places)')
-  .action(async (opts: { shortHash?: string; amount?: string }) => {
+  .option('--amount <usdt>', 'Amount in USDT (up to 2 decimal places)', '0.1')
+  .action(async (opts: { shortHash?: string; amount: string }) => {
     const shortHash =
       opts.shortHash ??
       (await input({
@@ -103,25 +100,17 @@ const articleCommand = new Command('article')
         validate: (val) => (val.trim() ? true : 'Article short hash is required'),
       }))
 
-    let amountRaw = opts.amount
-    if (amountRaw === undefined) {
-      amountRaw = await input({ message: 'Amount (USDT):', validate: validateAmount })
-    } else {
-      const result = validateAmount(amountRaw)
-      if (result !== true) {
-        console.error(result)
-        process.exit(1)
-      }
+    const amountRaw = opts.amount
+    const validation = validateAmount(amountRaw)
+    if (validation !== true) {
+      console.error(validation)
+      process.exit(1)
     }
     const amount = Number(amountRaw)
 
     const envJsonPath = requireEnvJson()
     const envJson = readEnvJson(envJsonPath)
-    const mattersApi = envJson.mattersApi as string | undefined
-    if (!mattersApi) {
-      console.error('Missing mattersApi in env.json')
-      process.exit(1)
-    }
+    const mattersApi = requireMattersApi(envJson)
     const network = resolveNetwork(envJson)
     const config = networks[network]
 
@@ -168,14 +157,8 @@ const articleCommand = new Command('article')
     const publicClient = getPublicClient(network)
     const walletClient = getWalletClient(network, wallet.privateKey)
 
-    const [usdtBalance, ethBalance, allowance] = await Promise.all([
-      publicClient.readContract({
-        address: config.tokenAddress,
-        abi: erc20Abi,
-        functionName: 'balanceOf',
-        args: [wallet.address],
-      }),
-      publicClient.getBalance({ address: wallet.address }),
+    const [{ usdtBalance, ethBalance }, allowance] = await Promise.all([
+      readWalletBalances(publicClient, config, wallet.address),
       publicClient.readContract({
         address: config.tokenAddress,
         abi: erc20Abi,

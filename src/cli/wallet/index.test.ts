@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const readContract = vi.fn()
+const getBalance = vi.fn()
+
 vi.mock('node:fs', () => ({
   default: {
     existsSync: vi.fn(),
@@ -8,6 +11,7 @@ vi.mock('node:fs', () => ({
 vi.mock('../../services/auth/index.js', () => ({
   readEnvJson: vi.fn(),
   requireEnvJson: vi.fn(() => '/test/env.json'),
+  requireMattersApi: vi.fn((envJson: Record<string, unknown>) => envJson.mattersApi as string),
   fetchGqlWithAuthRetry: vi.fn(),
 }))
 vi.mock('../../services/wallet/index.js', () => ({
@@ -25,6 +29,54 @@ vi.mock('../../services/gql/index.js', () => ({
     return errors.map((e) => e.message).join(', ')
   }),
 }))
+vi.mock('../../services/web3/index.js', () => {
+  const networks = {
+    production: {
+      chain: { id: 10 },
+      tokenAddress: '0xtoken',
+      curationAddress: '0xcuration',
+      curationVaultAddress: '0xvault',
+      tokenDecimals: 6,
+    },
+    staging: {
+      chain: { id: 11155420 },
+      tokenAddress: '0xtokenStaging',
+      curationAddress: '0xcurationStaging',
+      curationVaultAddress: '0xvaultStaging',
+      tokenDecimals: 6,
+    },
+  }
+  return {
+    networks,
+    getPublicClient: vi.fn(() => ({ readContract, getBalance })),
+    resolveNetwork: vi.fn((envJson: Record<string, unknown>) => {
+      const raw = (envJson.network as string | undefined) ?? 'production'
+      if (!(raw in networks)) {
+        console.error(`Unknown network in env.json: ${raw}. Use "production" or "staging".`)
+        process.exit(1)
+      }
+      return raw
+    }),
+    readWalletBalances: vi.fn(
+      async (
+        publicClient: { readContract: typeof readContract; getBalance: typeof getBalance },
+        config: { tokenAddress: string },
+        address: string,
+      ) => {
+        const [usdtBalance, ethBalance] = await Promise.all([
+          publicClient.readContract({
+            address: config.tokenAddress,
+            abi: [],
+            functionName: 'balanceOf',
+            args: [address],
+          }),
+          publicClient.getBalance({ address }),
+        ])
+        return { usdtBalance, ethBalance }
+      },
+    ),
+  }
+})
 vi.mock('viem/accounts', () => ({
   generatePrivateKey: vi.fn(() => '0xprivkey'),
   privateKeyToAccount: vi.fn(() => ({
@@ -172,6 +224,53 @@ describe('wallet command', () => {
 
       await expect(walletCommand.parseAsync(['unbind'], { from: 'user' })).rejects.toThrow('process.exit')
       expect(console.error).toHaveBeenCalledWith('Unbind failed:', 'no wallet to remove')
+    })
+  })
+
+  describe('balance', () => {
+    beforeEach(() => {
+      readContract.mockReset()
+      getBalance.mockReset()
+    })
+
+    it('prints USDT and ETH balances on production', async () => {
+      vi.mocked(readEnvJson).mockReturnValue({ network: 'production' })
+      vi.mocked(requireWallet).mockReturnValue({
+        walletJsonPath: '/test/wallet.json',
+        wallet: { address: '0xagent', privateKey: '0xkey' },
+      })
+      readContract.mockResolvedValueOnce(1_234_567n)
+      getBalance.mockResolvedValueOnce(1_234_000_000_000_000n)
+
+      await walletCommand.parseAsync(['balance'], { from: 'user' })
+
+      expect(console.log).toHaveBeenCalledWith('USDT: 1.234567')
+      expect(console.log).toHaveBeenCalledWith('ETH: 0.001234')
+    })
+
+    it('uses staging contracts when network is staging', async () => {
+      vi.mocked(readEnvJson).mockReturnValue({ network: 'staging' })
+      vi.mocked(requireWallet).mockReturnValue({
+        walletJsonPath: '/test/wallet.json',
+        wallet: { address: '0xagent', privateKey: '0xkey' },
+      })
+      readContract.mockResolvedValueOnce(0n)
+      getBalance.mockResolvedValueOnce(0n)
+
+      await walletCommand.parseAsync(['balance'], { from: 'user' })
+
+      expect(readContract).toHaveBeenCalledWith(
+        expect.objectContaining({ address: '0xtokenStaging', args: ['0xagent'] }),
+      )
+      expect(console.log).toHaveBeenCalledWith('USDT: 0')
+      expect(console.log).toHaveBeenCalledWith('ETH: 0')
+    })
+
+    it('exits on unknown network', async () => {
+      vi.mocked(readEnvJson).mockReturnValue({ network: 'mainnet' })
+
+      await expect(walletCommand.parseAsync(['balance'], { from: 'user' })).rejects.toThrow('process.exit')
+      expect(console.error).toHaveBeenCalledWith('Unknown network in env.json: mainnet. Use "production" or "staging".')
     })
   })
 })
