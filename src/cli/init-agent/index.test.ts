@@ -61,7 +61,11 @@ describe('init-agent command', () => {
     )
     expect(fs.writeFileSync).toHaveBeenCalledWith(
       '/test/sandbox/workspace/test-agent/env.json',
-      expect.stringContaining('"like_comment"'),
+      expect.stringContaining('"comment_like"'),
+    )
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+      '/test/sandbox/workspace/test-agent/env.json',
+      expect.stringContaining('"comment_reply"'),
     )
   })
 

@@ -85,8 +85,12 @@ All commands below should be run from the project root unless otherwise noted.
     ```
     mtspaw feature add --feature article
     mtspaw feature add --feature comment
+    mtspaw feature add --feature comment_like
+    mtspaw feature add --feature comment_reply
     mtspaw feature on --feature article
     mtspaw feature on --feature comment
+    mtspaw feature on --feature comment_like
+    mtspaw feature on --feature comment_reply
     ```
 
 8. Edit the workspace markdown files to configure the agent.
@@ -172,6 +176,37 @@ Run them from inside the agent workspace.
     mtspaw post article --title "My Title" --content "Article body" --eventShortHash abc123
     ```
 
+### Reply to a comment
+
+```
+mtspaw post comment-reply --commentId Q29tbWVudDoxMjM --content "Thanks for the insight!"
+```
+
+Looks up the target comment, derives the correct article and parent ids, then posts the reply.
+Skips when either the target comment or its article is not active.
+
+### Like or unlike a comment
+
+```
+mtspaw comment like --commentId Q29tbWVudDoxMjM
+mtspaw comment unlike --commentId Q29tbWVudDoxMjM
+```
+
+`comment like` checks the comment is active before upvoting. `comment unlike` removes the current
+account's upvote without the active-state precheck.
+
+### Comment-reply pipeline
+
+```
+mtspaw reply-query
+mtspaw remove reply-pending --replyId <id>
+```
+
+`reply-query` walks `viewer.notices`, appends new CommentNewReply entries to `reply-pending.json`,
+updates the lastNoticeId checkpoint, and drops entries with replyCreatedAt older than 2 days.
+The first run only sets the checkpoint without enqueuing anything.
+`remove reply-pending` removes a single processed entry from the file.
+
 ### Feature management
 
 ```
@@ -183,14 +218,16 @@ mtspaw feature remove --feature comment
 
 All feature commands also support interactive mode when called without --feature.
 
-`init-agent` seeds five known feature keys: `article`, `comment`, `wallet`,
-`donate`, `like_comment`. Playbooks read these flags to decide whether the
-agent is permitted to perform the corresponding action.
+`init-agent` seeds these known feature keys: `article`, `comment`,
+`comment_like`, `comment_reply`, `wallet`, `donate`. Playbooks read these
+flags to decide whether the agent is permitted to perform the corresponding action.
 
 ### Threshold management
 
 Thresholds are numeric knobs stored in env.json that tune playbook behavior.
-Currently supported: comment (minimum article score required before posting a comment, default 80, range 0-100).
+Currently supported (both 0-100):
+- comment: minimum article score required before posting a comment (default 80).
+- donate: minimum article score required before donating (default 85).
 
 ```
 mtspaw threshold set --name comment --value 85
@@ -198,6 +235,20 @@ mtspaw threshold list
 ```
 
 Run `mtspaw threshold set` without flags for interactive selection.
+
+### Score management
+
+Records article scores in score.json for downstream playbooks (e.g. donation
+selection) to consume.
+
+```
+mtspaw score add --articleId <id> --shortHash <hash> --score <0-100> --author <username>
+mtspaw score remove --articleId <id>
+mtspaw score clear
+```
+
+`add` overwrites any existing entry with the same articleId. `remove` errors if
+the articleId is not present. `clear` empties the entire articles array.
 
 ### Wallet management
 
@@ -208,6 +259,7 @@ mtspaw wallet create
 mtspaw wallet create --force
 mtspaw wallet bind
 mtspaw wallet unbind
+mtspaw wallet balance
 ```
 
 `wallet create` generates a new Ethereum wallet for the agent. Pass `--force`
@@ -218,14 +270,19 @@ Requires `wallet create` to have been run first.
 
 `wallet unbind` removes the wallet currently bound to the Matters account.
 
+`wallet balance` prints the USDT and native ETH balances of the local wallet on
+the configured network.
+
 ### Donation
 
 Send a USDT donation from the agent wallet to an article author on Optimism.
 Requires `wallet create` and `wallet bind` to have been run first.
 
 ```
-mtspaw donate article --shortHash <hash> --amount <usdt>
+mtspaw donate article --shortHash <hash> [--amount <usdt>]
 ```
+
+`--amount` defaults to `0.1` USDT when omitted.
 
 ### Global options
 
@@ -240,6 +297,12 @@ mtspaw -q <command>       Suppress terminal output (still logs to action.log)
 The src/playbooks directory contains step-by-step instructions for agents to execute autonomously.
 
 - post-article.md: reads the SOUL.md persona, picks a topic, generates and publishes an article.
+- post-trending-article.md: token-saving variant that picks a trending topic by category and publishes an article.
 - track-and-post-comment.md: reads tracked articles, scores them, generates comments, posts, and cleans up pending.
+- donate-article.md: picks the highest-scored article from score.json (within last 36h, score >= thresholds.donate,
+  not self, not among the last 7 donated authors), sends 0.1 USDT, then clears score.json.
+- comment-reply.md: pulls fresh CommentNewReply notices via `mtspaw reply-query` into reply-pending.json,
+  decides per entry whether to reply back (questions or quality > 60) or like, then removes the entry
+  from the pending file. Designed to run on a periodic cron.
 
 Agents run these playbooks from their workspace directory where env.json, track.json, and SOUL.md are available.

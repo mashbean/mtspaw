@@ -30,9 +30,10 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
     choices: [
       { name: 'article', value: 'article' },
       { name: 'comment', value: 'comment' },
+      { name: 'comment_like', value: 'comment_like' },
+      { name: 'comment_reply', value: 'comment_reply' },
       { name: 'wallet', value: 'wallet' },
       { name: 'donate', value: 'donate' },
-      { name: 'like_comment', value: 'like_comment' },
     ],
   })
 
@@ -60,9 +61,10 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
     features: {
       article: enabledFeatures.includes('article'),
       comment: enabledFeatures.includes('comment'),
+      comment_like: enabledFeatures.includes('comment_like'),
+      comment_reply: enabledFeatures.includes('comment_reply'),
       wallet: enabledFeatures.includes('wallet'),
       donate: enabledFeatures.includes('donate'),
-      like_comment: enabledFeatures.includes('like_comment'),
     },
     thresholds: {
       comment: 80,

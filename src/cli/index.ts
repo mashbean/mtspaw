@@ -14,6 +14,7 @@ dotenv.config({ path: path.resolve(import.meta.dirname, '../../.env'), quiet: tr
 setupConsoleLogger()
 import pkg from '../../package.json' with { type: 'json' }
 import { logAction, setFileLogging, setQuietMode, setupConsoleLogger } from '../services/logger/index.js'
+import { commentCommand } from './comment/index.js'
 import { donateCommand } from './donate/index.js'
 import { envCommand } from './env/index.js'
 import { featureCommand } from './feature/index.js'
@@ -24,6 +25,7 @@ import { postCommand } from './post/index.js'
 import { readCommand } from './read/index.js'
 import { removeCommand } from './remove/index.js'
 import { renewCommand } from './renew/index.js'
+import { replyQueryCommand } from './reply-query/index.js'
 import { scoreCommand } from './score/index.js'
 import { syncSchemaCommand } from './sync-schema/index.js'
 import { thresholdCommand } from './threshold/index.js'
@@ -96,6 +98,7 @@ program.addHelpText('after', () => {
   return ''
 })
 
+program.addCommand(commentCommand)
 program.addCommand(donateCommand)
 program.addCommand(envCommand)
 program.addCommand(featureCommand)
@@ -106,6 +109,7 @@ program.addCommand(postCommand)
 program.addCommand(readCommand)
 program.addCommand(removeCommand)
 program.addCommand(renewCommand)
+program.addCommand(replyQueryCommand)
 program.addCommand(scoreCommand)
 program.addCommand(syncSchemaCommand)
 program.addCommand(thresholdCommand)

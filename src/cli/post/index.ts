@@ -4,8 +4,15 @@ import path from 'node:path'
 import { input, select } from '@inquirer/prompts'
 import { Command } from 'commander'
 
-import { ensureAuth, login, readEnvJson } from '../../services/auth/index.js'
-import { fetchGql } from '../../services/gql/index.js'
+import {
+  ensureAuth,
+  fetchGqlWithAuthRetry,
+  login,
+  readEnvJson,
+  requireEnvJson,
+  requireMattersApi,
+} from '../../services/auth/index.js'
+import { fetchGql, formatGqlErrors } from '../../services/gql/index.js'
 
 const ARTICLE_QUERY = `
   query Article($input: ArticleInput!) {
@@ -350,9 +357,107 @@ const articleCommand = new Command('article')
     }
   })
 
+const COMMENT_LOOKUP_QUERY = `
+  query CommentLookup($input: NodeInput!) {
+    node(input: $input) {
+      ... on Comment {
+        id
+        state
+        parentComment {
+          id
+        }
+        node {
+          ... on Article {
+            id
+            state
+          }
+        }
+      }
+    }
+  }
+`
+
+const commentReplyCommand = new Command('comment-reply')
+  .description('Reply to an existing article comment')
+  .option('--commentId <id>', 'Target comment ID to reply to')
+  .option('--content <text>', 'Reply content')
+  .action(async (opts: { commentId?: string; content?: string }) => {
+    const envJsonPath = requireEnvJson()
+    const envJson = readEnvJson(envJsonPath)
+    const mattersApi = requireMattersApi(envJson)
+
+    const commentId =
+      opts.commentId ??
+      (await input({
+        message: 'Comment ID:',
+        validate: (val) => (val.trim() ? true : 'Comment ID is required'),
+      }))
+
+    const content =
+      opts.content ??
+      (await input({
+        message: 'Reply content:',
+        validate: (val) => (val.trim() ? true : 'Reply content is required'),
+      }))
+
+    try {
+      const lookup = await fetchGql(mattersApi, COMMENT_LOOKUP_QUERY, { input: { id: commentId } })
+      const lookupErr = formatGqlErrors(lookup)
+      if (lookupErr) {
+        console.error('Comment lookup failed:', lookupErr)
+        process.exit(1)
+      }
+
+      const target = lookup?.data?.node
+      if (!target?.id) {
+        console.error(`Comment not found: ${commentId}`)
+        process.exit(1)
+      }
+      if (target.state !== 'active') {
+        console.log(`Comment is not active (state: ${target.state}), skipping`)
+        return
+      }
+      const article = target.node
+      if (!article?.id) {
+        console.error('Comment is not attached to an article')
+        process.exit(1)
+      }
+      if (article.state !== 'active') {
+        console.log(`Article is not active (state: ${article.state}), skipping`)
+        return
+      }
+
+      const parentId = target.parentComment?.id ?? commentId
+      const replyTo = commentId
+
+      const { result, errorMessage } = await fetchGqlWithAuthRetry(envJsonPath, mattersApi, PUT_COMMENT_MUTATION, {
+        input: {
+          comment: {
+            type: 'article',
+            articleId: article.id,
+            content,
+            parentId,
+            replyTo,
+          },
+        },
+      })
+      if (errorMessage) {
+        console.error('Reply failed:', errorMessage)
+        process.exit(1)
+      }
+
+      const replyId = (result as { data?: { putComment?: { id?: string } } })?.data?.putComment?.id
+      console.log('Reply posted:', replyId)
+    } catch (err) {
+      console.error('Reply failed:', (err as Error).message)
+      process.exit(1)
+    }
+  })
+
 const postCommand = new Command('post').description('Post content to Matters')
 
 postCommand.addCommand(articleCommentCommand)
 postCommand.addCommand(articleCommand)
+postCommand.addCommand(commentReplyCommand)
 
 export { postCommand }

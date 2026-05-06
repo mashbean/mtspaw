@@ -7,16 +7,26 @@ vi.mock('../../services/auth/index.js', () => ({
   ensureAuth: vi.fn(),
   login: vi.fn(),
   readEnvJson: vi.fn(),
+  requireEnvJson: vi.fn(() => '/test/env.json'),
+  requireMattersApi: vi.fn((envJson: Record<string, unknown>) => envJson.mattersApi as string),
+  fetchGqlWithAuthRetry: vi.fn(),
 }))
 vi.mock('../../services/gql/index.js', () => ({
   fetchGql: vi.fn(),
+  formatGqlErrors: vi.fn((result: unknown) => {
+    const errors = (result as { errors?: { message: string }[] } | null)?.errors
+    if (!errors || errors.length === 0) {
+      return null
+    }
+    return errors.map((e) => e.message).join(', ')
+  }),
 }))
 vi.mock('@inquirer/prompts', () => ({
   input: vi.fn(),
   select: vi.fn(),
 }))
 
-import { ensureAuth, readEnvJson } from '../../services/auth/index.js'
+import { ensureAuth, fetchGqlWithAuthRetry, readEnvJson } from '../../services/auth/index.js'
 import { fetchGql } from '../../services/gql/index.js'
 import { postCommand } from './index.js'
 
@@ -132,5 +142,162 @@ describe('post article command', () => {
       postCommand.parseAsync(['article', '--title', 'Test', '--content', 'Hello'], { from: 'user' }),
     ).rejects.toThrow('process.exit')
     expect(console.error).toHaveBeenCalledWith('Draft creation failed:', 'Draft error')
+  })
+})
+
+describe('post comment-reply command', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.spyOn(process, 'cwd').mockReturnValue('/test')
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit')
+    })
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(readEnvJson).mockReturnValue({ mattersApi: 'https://api.test' })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('replies to a top-level comment with parentId = commentId', async () => {
+    vi.mocked(fetchGql).mockResolvedValueOnce({
+      data: {
+        node: {
+          id: 'c1',
+          state: 'active',
+          parentComment: null,
+          node: { id: 'a1', state: 'active' },
+        },
+      },
+    })
+    vi.mocked(fetchGqlWithAuthRetry).mockResolvedValueOnce({
+      result: { data: { putComment: { id: 'reply1' } } },
+      errorMessage: null,
+    })
+
+    await postCommand.parseAsync(['comment-reply', '--commentId', 'c1', '--content', 'hi'], { from: 'user' })
+
+    expect(fetchGqlWithAuthRetry).toHaveBeenCalledWith(
+      '/test/env.json',
+      'https://api.test',
+      expect.stringContaining('putComment'),
+      {
+        input: {
+          comment: {
+            type: 'article',
+            articleId: 'a1',
+            content: 'hi',
+            parentId: 'c1',
+            replyTo: 'c1',
+          },
+        },
+      },
+    )
+    expect(console.log).toHaveBeenCalledWith('Reply posted:', 'reply1')
+  })
+
+  it('replies to a nested comment with parentId = parentComment.id', async () => {
+    vi.mocked(fetchGql).mockResolvedValueOnce({
+      data: {
+        node: {
+          id: 'c2',
+          state: 'active',
+          parentComment: { id: 'c-root' },
+          node: { id: 'a1', state: 'active' },
+        },
+      },
+    })
+    vi.mocked(fetchGqlWithAuthRetry).mockResolvedValueOnce({
+      result: { data: { putComment: { id: 'reply2' } } },
+      errorMessage: null,
+    })
+
+    await postCommand.parseAsync(['comment-reply', '--commentId', 'c2', '--content', 'nested'], { from: 'user' })
+
+    expect(fetchGqlWithAuthRetry).toHaveBeenCalledWith(
+      '/test/env.json',
+      'https://api.test',
+      expect.stringContaining('putComment'),
+      {
+        input: {
+          comment: {
+            type: 'article',
+            articleId: 'a1',
+            content: 'nested',
+            parentId: 'c-root',
+            replyTo: 'c2',
+          },
+        },
+      },
+    )
+    expect(console.log).toHaveBeenCalledWith('Reply posted:', 'reply2')
+  })
+
+  it('exits when comment is not found', async () => {
+    vi.mocked(fetchGql).mockResolvedValueOnce({ data: { node: null } })
+
+    await expect(
+      postCommand.parseAsync(['comment-reply', '--commentId', 'cx', '--content', 'hi'], { from: 'user' }),
+    ).rejects.toThrow('process.exit')
+    expect(console.error).toHaveBeenCalledWith('Comment not found: cx')
+  })
+
+  it('skips when target comment is not active', async () => {
+    vi.mocked(fetchGql).mockResolvedValueOnce({
+      data: {
+        node: {
+          id: 'c1',
+          state: 'archived',
+          parentComment: null,
+          node: { id: 'a1', state: 'active' },
+        },
+      },
+    })
+
+    await postCommand.parseAsync(['comment-reply', '--commentId', 'c1', '--content', 'hi'], { from: 'user' })
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Comment is not active'))
+    expect(fetchGqlWithAuthRetry).not.toHaveBeenCalled()
+  })
+
+  it('skips when article is not active', async () => {
+    vi.mocked(fetchGql).mockResolvedValueOnce({
+      data: {
+        node: {
+          id: 'c1',
+          state: 'active',
+          parentComment: null,
+          node: { id: 'a1', state: 'archived' },
+        },
+      },
+    })
+
+    await postCommand.parseAsync(['comment-reply', '--commentId', 'c1', '--content', 'hi'], { from: 'user' })
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Article is not active'))
+    expect(fetchGqlWithAuthRetry).not.toHaveBeenCalled()
+  })
+
+  it('exits when server returns an error on putComment', async () => {
+    vi.mocked(fetchGql).mockResolvedValueOnce({
+      data: {
+        node: {
+          id: 'c1',
+          state: 'active',
+          parentComment: null,
+          node: { id: 'a1', state: 'active' },
+        },
+      },
+    })
+    vi.mocked(fetchGqlWithAuthRetry).mockResolvedValueOnce({
+      result: { errors: [{ message: 'forbidden' }] },
+      errorMessage: 'forbidden',
+    })
+
+    await expect(
+      postCommand.parseAsync(['comment-reply', '--commentId', 'c1', '--content', 'hi'], { from: 'user' }),
+    ).rejects.toThrow('process.exit')
+    expect(console.error).toHaveBeenCalledWith('Reply failed:', 'forbidden')
   })
 })

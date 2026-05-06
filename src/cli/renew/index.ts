@@ -9,6 +9,10 @@ const buildTargets = (): Record<string, { src: string; dest: string }> => ({
     src: path.resolve(import.meta.dirname, '../../../src/guides/AGENTS.md'),
     dest: path.join(process.cwd(), 'AGENTS.md'),
   },
+  'comment-reply.md': {
+    src: path.resolve(import.meta.dirname, '../../../src/playbooks/comment-reply.md'),
+    dest: path.join(process.cwd(), 'playbooks/comment-reply.md'),
+  },
   'donate-article.md': {
     src: path.resolve(import.meta.dirname, '../../../src/playbooks/donate-article.md'),
     dest: path.join(process.cwd(), 'playbooks/donate-article.md'),
