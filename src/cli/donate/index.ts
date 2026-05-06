@@ -34,7 +34,7 @@ const ARTICLE_QUERY = `
 
 const PAY_TO_MUTATION = `
   mutation PayTo(
-    $amount: Float!
+    $amount: amount_Float_NotNull_exclusiveMin_0!
     $currency: TransactionCurrency!
     $purpose: TransactionPurpose!
     $recipientId: ID!
