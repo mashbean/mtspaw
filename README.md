@@ -205,6 +205,8 @@ mtspaw remove reply-pending --replyId <id>
 `reply-query` walks `viewer.notices`, appends new CommentNewReply entries to `reply-pending.json`,
 updates the lastNoticeId checkpoint, and drops entries with replyCreatedAt older than 2 days.
 The first run only sets the checkpoint without enqueuing anything.
+Pass `--dry-run` to print would-be checkpoint and new entries (with each reply / parent excerpt)
+without writing the file.
 `remove reply-pending` removes a single processed entry from the file.
 
 ### Feature management

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../services/auth/index.js', () => ({
-  readEnvJson: vi.fn(() => ({ mattersApi: 'https://api.test' })),
+  readEnvJson: vi.fn(() => ({ mattersApi: 'https://api.test', userName: 'self' })),
   requireEnvJson: vi.fn(() => '/test/env.json'),
   requireMattersApi: vi.fn((envJson: Record<string, unknown>) => envJson.mattersApi as string),
   fetchGqlWithAuthRetry: vi.fn(),
@@ -52,7 +52,50 @@ const buildNotice = (overrides: {
   },
 })
 
-const buildPage = (edges: ReturnType<typeof buildNotice>[], hasNextPage = false, endCursor: string | null = null) => ({
+const buildMentionNotice = (overrides: {
+  id: string
+  createdAt: string
+  replyId?: string
+  replyState?: string
+  replyContent?: string
+  replyAuthorUserName?: string
+  replyCreatedAt?: string
+  parentId?: string
+  parentContent?: string
+  parentAuthorUserName?: string | null
+  articleId?: string
+  articleState?: string
+}) => ({
+  cursor: `cursor:${overrides.id}`,
+  node: {
+    id: overrides.id,
+    createdAt: overrides.createdAt,
+    __typename: 'CommentNotice',
+    type: 'CommentMentionedYou',
+    target: {
+      id: overrides.replyId ?? `Comment:r-${overrides.id}`,
+      state: overrides.replyState ?? 'active',
+      content: overrides.replyContent ?? '<p>their reply</p>',
+      createdAt: overrides.replyCreatedAt ?? overrides.createdAt,
+      author: { userName: overrides.replyAuthorUserName ?? 'alice' },
+      parentComment:
+        overrides.parentAuthorUserName === null
+          ? null
+          : {
+              id: overrides.parentId ?? 'Comment:p1',
+              content: overrides.parentContent ?? '<p>my comment</p>',
+              author: { userName: overrides.parentAuthorUserName ?? 'self' },
+            },
+      node: { id: overrides.articleId ?? 'Article:a1', state: overrides.articleState ?? 'active' },
+    },
+  },
+})
+
+const buildPage = (
+  edges: (ReturnType<typeof buildNotice> | ReturnType<typeof buildMentionNotice>)[],
+  hasNextPage = false,
+  endCursor: string | null = null,
+) => ({
   result: {
     data: {
       viewer: {
@@ -243,5 +286,98 @@ describe('reply-query command', () => {
     const writeArg = vi.mocked(writeReplyPendingJson).mock.calls[0][0]
     expect(writeArg.lastNoticeId).toBe('Notice:p1a')
     expect(writeArg.replies.map((r) => r.replyId)).toEqual(['Comment:p1a', 'Comment:p1b', 'Comment:p2a'])
+  })
+
+  it('captures CommentMentionedYou when parentComment.author equals SELF', async () => {
+    vi.mocked(readReplyPendingJson).mockReturnValue({
+      lastNoticeId: 'Notice:cp',
+      lastNoticeCreatedAt: '2026-05-05T08:00:00.000Z',
+      replies: [],
+    })
+    vi.mocked(fetchGqlWithAuthRetry).mockResolvedValueOnce(
+      buildPage([
+        buildMentionNotice({
+          id: 'Notice:m1',
+          createdAt: '2026-05-05T11:00:00.000Z',
+          replyId: 'Comment:m-r1',
+          parentAuthorUserName: 'self',
+        }),
+        buildNotice({ id: 'Notice:cp', createdAt: '2026-05-05T08:00:00.000Z' }),
+      ]),
+    )
+
+    await replyQueryCommand.parseAsync([], { from: 'user' })
+
+    const writeArg = vi.mocked(writeReplyPendingJson).mock.calls[0][0]
+    expect(writeArg.replies.map((r) => r.replyId)).toEqual(['Comment:m-r1'])
+    expect(writeArg.replies[0].parentCommentContent).toBe('<p>my comment</p>')
+  })
+
+  it('skips CommentMentionedYou when parentComment.author is not SELF', async () => {
+    vi.mocked(readReplyPendingJson).mockReturnValue({
+      lastNoticeId: 'Notice:cp',
+      lastNoticeCreatedAt: '2026-05-05T08:00:00.000Z',
+      replies: [],
+    })
+    vi.mocked(fetchGqlWithAuthRetry).mockResolvedValueOnce(
+      buildPage([
+        buildMentionNotice({
+          id: 'Notice:m2',
+          createdAt: '2026-05-05T11:00:00.000Z',
+          replyId: 'Comment:m-r2',
+          parentAuthorUserName: 'someoneElse',
+        }),
+        buildNotice({ id: 'Notice:cp', createdAt: '2026-05-05T08:00:00.000Z' }),
+      ]),
+    )
+
+    await replyQueryCommand.parseAsync([], { from: 'user' })
+
+    const writeArg = vi.mocked(writeReplyPendingJson).mock.calls[0][0]
+    expect(writeArg.replies).toEqual([])
+  })
+
+  it('skips CommentMentionedYou when parentComment is missing (top-level mention)', async () => {
+    vi.mocked(readReplyPendingJson).mockReturnValue({
+      lastNoticeId: 'Notice:cp',
+      lastNoticeCreatedAt: '2026-05-05T08:00:00.000Z',
+      replies: [],
+    })
+    vi.mocked(fetchGqlWithAuthRetry).mockResolvedValueOnce(
+      buildPage([
+        buildMentionNotice({
+          id: 'Notice:m3',
+          createdAt: '2026-05-05T11:00:00.000Z',
+          replyId: 'Comment:m-r3',
+          parentAuthorUserName: null,
+        }),
+        buildNotice({ id: 'Notice:cp', createdAt: '2026-05-05T08:00:00.000Z' }),
+      ]),
+    )
+
+    await replyQueryCommand.parseAsync([], { from: 'user' })
+
+    const writeArg = vi.mocked(writeReplyPendingJson).mock.calls[0][0]
+    expect(writeArg.replies).toEqual([])
+  })
+
+  it('--dry-run prints summary and does not write reply-pending.json', async () => {
+    vi.mocked(readReplyPendingJson).mockReturnValue({
+      lastNoticeId: 'Notice:cp',
+      lastNoticeCreatedAt: '2026-05-05T08:00:00.000Z',
+      replies: [],
+    })
+    vi.mocked(fetchGqlWithAuthRetry).mockResolvedValueOnce(
+      buildPage([
+        buildNotice({ id: 'Notice:n1', createdAt: '2026-05-05T11:00:00.000Z', replyId: 'Comment:r1' }),
+        buildNotice({ id: 'Notice:cp', createdAt: '2026-05-05T08:00:00.000Z' }),
+      ]),
+    )
+
+    await replyQueryCommand.parseAsync(['--dry-run'], { from: 'user' })
+
+    expect(writeReplyPendingJson).not.toHaveBeenCalled()
+    expect(console.log).toHaveBeenCalledWith('--- reply-query dry-run (no write) ---')
+    expect(console.log).toHaveBeenCalledWith('would append: 1 new entries')
   })
 })

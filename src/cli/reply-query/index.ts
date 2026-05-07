@@ -33,6 +33,22 @@ const NOTICES_QUERY = `
                 author { userName }
               }
             }
+            ... on CommentNotice {
+              type
+              target {
+                id
+                state
+                content
+                createdAt
+                author { userName }
+                parentComment {
+                  id
+                  content
+                  author { userName }
+                }
+                node { ... on Article { id state } }
+              }
+            }
           }
         }
       }
@@ -49,8 +65,15 @@ interface NoticeEdge {
     type?: string
     target?: {
       id: string
+      state?: string
       content?: string | null
+      createdAt?: string
       author?: { userName?: string | null } | null
+      parentComment?: {
+        id: string
+        content?: string | null
+        author?: { userName?: string | null } | null
+      } | null
       node?: { id?: string; state?: string } | null
     } | null
     comment?: {
@@ -74,40 +97,71 @@ interface NoticesResponse {
   }
 }
 
-const NOTICE_TYPENAME = 'CommentCommentNotice'
+const NOTICE_TYPENAME_COMMENT_COMMENT = 'CommentCommentNotice'
+const NOTICE_TYPENAME_COMMENT = 'CommentNotice'
 const NOTICE_TYPE_NEW_REPLY = 'CommentNewReply'
+const NOTICE_TYPE_MENTIONED_YOU = 'CommentMentionedYou'
 
-const isCommentNewReply = (edge: NoticeEdge) => {
-  return edge.node.__typename === NOTICE_TYPENAME && edge.node.type === NOTICE_TYPE_NEW_REPLY
-}
+const toEntry = (edge: NoticeEdge, self: string): ReplyEntry | null => {
+  const node = edge.node
 
-const toEntry = (edge: NoticeEdge): ReplyEntry | null => {
-  const reply = edge.node.comment
-  const target = edge.node.target
-  if (!reply || !target) {
-    return null
+  if (node.__typename === NOTICE_TYPENAME_COMMENT_COMMENT && node.type === NOTICE_TYPE_NEW_REPLY) {
+    const reply = node.comment
+    const target = node.target
+    if (!reply || !target) {
+      return null
+    }
+    return {
+      noticeId: node.id,
+      noticeCreatedAt: node.createdAt,
+      replyId: reply.id,
+      replyContent: reply.content ?? '',
+      replyAuthorUserName: reply.author?.userName ?? '',
+      replyState: reply.state,
+      replyCreatedAt: reply.createdAt,
+      parentCommentId: target.id,
+      parentCommentContent: target.content ?? '',
+      articleId: target.node?.id ?? '',
+      articleState: target.node?.state ?? '',
+    }
   }
-  return {
-    noticeId: edge.node.id,
-    noticeCreatedAt: edge.node.createdAt,
-    replyId: reply.id,
-    replyContent: reply.content ?? '',
-    replyAuthorUserName: reply.author?.userName ?? '',
-    replyState: reply.state,
-    replyCreatedAt: reply.createdAt,
-    parentCommentId: target.id,
-    parentCommentContent: target.content ?? '',
-    articleId: target.node?.id ?? '',
-    articleState: target.node?.state ?? '',
+
+  if (node.__typename === NOTICE_TYPENAME_COMMENT && node.type === NOTICE_TYPE_MENTIONED_YOU) {
+    const target = node.target
+    const parent = target?.parentComment
+    if (!target || !parent) {
+      return null
+    }
+    if (parent.author?.userName !== self) {
+      return null
+    }
+    return {
+      noticeId: node.id,
+      noticeCreatedAt: node.createdAt,
+      replyId: target.id,
+      replyContent: target.content ?? '',
+      replyAuthorUserName: target.author?.userName ?? '',
+      replyState: target.state ?? '',
+      replyCreatedAt: target.createdAt ?? node.createdAt,
+      parentCommentId: parent.id,
+      parentCommentContent: parent.content ?? '',
+      articleId: target.node?.id ?? '',
+      articleState: target.node?.state ?? '',
+    }
   }
+
+  return null
 }
 
 const replyQueryCommand = new Command('reply-query')
   .description('Fetch new comment-reply notices into reply-pending.json')
-  .action(async () => {
+  .option('--dry-run', 'Print would-be checkpoint advance and new entries; do not write reply-pending.json')
+  .action(async (opts: { dryRun?: boolean }) => {
     const envJsonPath = requireEnvJson()
     const envJson = readEnvJson(envJsonPath)
     const mattersApi = requireMattersApi(envJson)
+    const self = (envJson.userName as string | undefined) ?? ''
+    const dryRun = !!opts.dryRun
 
     const state: ReplyPendingJson = readReplyPendingJson()
 
@@ -154,6 +208,14 @@ const replyQueryCommand = new Command('reply-query')
         firstNoticeCreatedAt = edges[0].node.createdAt
       }
 
+      if (dryRun) {
+        for (const edge of edges) {
+          console.log(
+            `  scan: ${edge.node.id} @ ${edge.node.createdAt} __typename=${edge.node.__typename} type=${edge.node.type ?? '(none)'}`,
+          )
+        }
+      }
+
       if (isFirstRun) {
         break
       }
@@ -170,10 +232,7 @@ const replyQueryCommand = new Command('reply-query')
             break
           }
         }
-        if (!isCommentNewReply(edge)) {
-          continue
-        }
-        const entry = toEntry(edge)
+        const entry = toEntry(edge, self)
         if (entry) {
           newEntries.push(entry)
         }
@@ -186,6 +245,25 @@ const replyQueryCommand = new Command('reply-query')
         break
       }
       cursor = conn.pageInfo.endCursor
+    }
+
+    if (dryRun) {
+      console.log('--- reply-query dry-run (no write) ---')
+      console.log(`isFirstRun: ${isFirstRun}`)
+      console.log(`prev checkpoint: ${checkpointId ?? '(none)'} @ ${state.lastNoticeCreatedAt ?? '(none)'}`)
+      console.log(
+        `would-be checkpoint: ${firstNoticeId ?? checkpointId ?? '(none)'} @ ${firstNoticeCreatedAt ?? state.lastNoticeCreatedAt ?? '(none)'}`,
+      )
+      console.log(`would drop by TTL: ${droppedByTtl}`)
+      console.log(`would append: ${newEntries.length} new entries`)
+      for (const entry of newEntries) {
+        console.log(
+          `  - ${entry.replyId} by @${entry.replyAuthorUserName} on ${entry.articleId} (${entry.articleState})`,
+        )
+        console.log(`    reply (${entry.replyContent.length} chars): ${entry.replyContent.slice(0, 120)}`)
+        console.log(`    parent: ${entry.parentCommentContent.slice(0, 120)}`)
+      }
+      return
     }
 
     if (firstNoticeId && firstNoticeCreatedAt) {
