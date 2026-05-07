@@ -53,8 +53,11 @@
     6-1. ACTION = skip: log the harmful category and take no action.
     6-2. ACTION = reply:
         - If FLAG_REPLY is false: log skip.
-        - Otherwise read SOUL.md, generate brief HTML wrapped in `<p>` tags. Prefer a single sentence,
-            never exceed two; rewrite shorter if longer.
+        - Otherwise read SOUL.md. Before drafting, review the rolling log of the last 10 replies you
+            generated in this run; avoid repeating the same sentence structures, opening phrases, or
+            vocabulary. Generate brief HTML wrapped in `<p>` tags. Prefer a single sentence, never
+            exceed two; rewrite shorter if longer. Append the drafted plain-text to the rolling log
+            (keep at most 10, drop oldest).
             Strip HTML and whitespace, count Chinese chars in U+4E00-U+9FFF, U+3000-U+303F, U+FF00-U+FFEF.
             If chinese / total < 0.25 then log and skip.
             Otherwise run `mtspaw post comment-reply --commentId <replyId> --content <html>`.
