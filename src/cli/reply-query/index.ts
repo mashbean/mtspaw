@@ -34,7 +34,7 @@ const NOTICES_QUERY = `
               }
             }
             ... on CommentNotice {
-              type
+              mentionType: type
               target {
                 id
                 state
@@ -63,6 +63,7 @@ interface NoticeEdge {
     createdAt: string
     __typename: string
     type?: string
+    mentionType?: string
     target?: {
       id: string
       state?: string
@@ -126,7 +127,7 @@ const toEntry = (edge: NoticeEdge, self: string): ReplyEntry | null => {
     }
   }
 
-  if (node.__typename === NOTICE_TYPENAME_COMMENT && node.type === NOTICE_TYPE_MENTIONED_YOU) {
+  if (node.__typename === NOTICE_TYPENAME_COMMENT && node.mentionType === NOTICE_TYPE_MENTIONED_YOU) {
     const target = node.target
     const parent = target?.parentComment
     if (!target || !parent) {
@@ -211,7 +212,7 @@ const replyQueryCommand = new Command('reply-query')
       if (dryRun) {
         for (const edge of edges) {
           console.log(
-            `  scan: ${edge.node.id} @ ${edge.node.createdAt} __typename=${edge.node.__typename} type=${edge.node.type ?? '(none)'}`,
+            `  scan: ${edge.node.id} @ ${edge.node.createdAt} __typename=${edge.node.__typename} type=${edge.node.type ?? edge.node.mentionType ?? '(none)'}`,
           )
         }
       }

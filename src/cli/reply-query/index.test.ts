@@ -71,7 +71,7 @@ const buildMentionNotice = (overrides: {
     id: overrides.id,
     createdAt: overrides.createdAt,
     __typename: 'CommentNotice',
-    type: 'CommentMentionedYou',
+    mentionType: 'CommentMentionedYou',
     target: {
       id: overrides.replyId ?? `Comment:r-${overrides.id}`,
       state: overrides.replyState ?? 'active',
