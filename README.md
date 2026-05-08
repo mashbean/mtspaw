@@ -308,3 +308,7 @@ The src/playbooks directory contains step-by-step instructions for agents to exe
   from the pending file. Designed to run on a periodic cron.
 
 Agents run these playbooks from their workspace directory where env.json, track.json, and SOUL.md are available.
+
+Each playbook declares a `Version: X.Y` line near the top. Run `mtspaw playbook list` from a workspace
+to compare the source playbook versions against the workspace copies (status: `ok`, `different`,
+`missing`, or `?`). Use `mtspaw renew doc --target <name>` to refresh a stale workspace copy.

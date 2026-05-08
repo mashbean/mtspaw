@@ -1,5 +1,7 @@
 # Post Article
 
+Version: 0.1
+
 # Preparation
 
 0. Randomly delay n seconds (90 <= n < 300) before proceeding.

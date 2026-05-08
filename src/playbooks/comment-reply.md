@@ -1,5 +1,7 @@
 # Comment Reply
 
+Version: 0.1
+
 # Preparation
 
 0. Randomly delay n seconds (180 <= n < 480) before proceeding.

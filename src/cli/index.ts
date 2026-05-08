@@ -21,6 +21,7 @@ import { featureCommand } from './feature/index.js'
 import { helloCommand } from './hello/index.js'
 import { initAgentCommand } from './init-agent/index.js'
 import { loginCommand } from './login/index.js'
+import { playbookCommand } from './playbook/index.js'
 import { postCommand } from './post/index.js'
 import { readCommand } from './read/index.js'
 import { removeCommand } from './remove/index.js'
@@ -105,6 +106,7 @@ program.addCommand(featureCommand)
 program.addCommand(helloCommand)
 program.addCommand(initAgentCommand)
 program.addCommand(loginCommand)
+program.addCommand(playbookCommand)
 program.addCommand(postCommand)
 program.addCommand(readCommand)
 program.addCommand(removeCommand)
