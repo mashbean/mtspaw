@@ -40,6 +40,8 @@ const listCommand = new Command('list')
       let status: string
       if (!workspaceExists) {
         status = 'missing'
+      } else if (sourceVersion !== null && workspaceVersion === null) {
+        status = 'legacy'
       } else if (sourceVersion === null || workspaceVersion === null) {
         status = '?'
       } else if (sourceVersion === workspaceVersion) {

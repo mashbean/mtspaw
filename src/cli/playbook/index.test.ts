@@ -74,6 +74,24 @@ describe('playbook list command', () => {
     )
   })
 
+  it('reports legacy when source has version but workspace lacks one', async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+    vi.mocked(fs.readdirSync).mockReturnValue(['post-article.md'] as unknown as ReturnType<typeof fs.readdirSync>)
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      const s = String(p)
+      if (s.includes('src/playbooks/')) {
+        return '# Post Article\n\nVersion: 0.1\n'
+      }
+      return '# Post Article\n\nNo version field here.\n'
+    })
+
+    await playbookCommand.parseAsync(['list'], { from: 'user' })
+
+    expect(console.log).toHaveBeenCalledWith(
+      expect.stringMatching(/post-article\.md.*source=0\.1.*workspace=\?.*legacy/),
+    )
+  })
+
   it('reports ? when version line is missing in either side', async () => {
     vi.mocked(fs.existsSync).mockReturnValue(true)
     vi.mocked(fs.readdirSync).mockReturnValue(['legacy.md'] as unknown as ReturnType<typeof fs.readdirSync>)

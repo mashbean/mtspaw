@@ -311,4 +311,5 @@ Agents run these playbooks from their workspace directory where env.json, track.
 
 Each playbook declares a `Version: X.Y` line near the top. Run `mtspaw playbook list` from a workspace
 to compare the source playbook versions against the workspace copies (status: `ok`, `different`,
-`missing`, or `?`). Use `mtspaw renew doc --target <name>` to refresh a stale workspace copy.
+`legacy`, `missing`, or `?`). `legacy` means the workspace copy is from before the version line was
+added. Use `mtspaw renew doc --target <name>` to refresh a stale workspace copy.
