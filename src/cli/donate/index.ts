@@ -131,10 +131,6 @@ const articleCommand = new Command('article')
       console.error(`Article is not active (state: ${article.state})`)
       process.exit(1)
     }
-    if (!article.dataHash) {
-      console.error('Article is missing dataHash; cannot construct uri')
-      process.exit(1)
-    }
     const author = article.author
     if (!author?.id) {
       console.error('Article author id missing')
@@ -151,7 +147,7 @@ const articleCommand = new Command('article')
     }
 
     const parsedAmount = parseUnits(amountRaw, config.tokenDecimals)
-    const uri = `ipfs://${article.dataHash}`
+    const uri = article.dataHash ? `ipfs://${article.dataHash}` : `https://matters.town/a/${shortHash}`
     const spender = useVault ? config.curationVaultAddress : config.curationAddress
 
     const publicClient = getPublicClient(network)

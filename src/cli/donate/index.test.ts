@@ -166,14 +166,23 @@ describe('donate article command', () => {
     expect(console.error).toHaveBeenCalledWith('Article is not active (state: archived)')
   })
 
-  it('exits when article is missing dataHash', async () => {
+  it('falls back to matters web URL when dataHash is missing', async () => {
     setBaseEnv()
     vi.mocked(fetchGql).mockResolvedValueOnce(articleQueryResult({ dataHash: null }))
+    vi.mocked(fetchGqlWithAuthRetry).mockResolvedValueOnce(payToDraft).mockResolvedValueOnce(payToSettle)
+    readContract.mockResolvedValueOnce(10_000_000n).mockResolvedValueOnce(10_000_000n)
+    getBalance.mockResolvedValueOnce(10_000_000_000_000n)
+    writeContract.mockResolvedValueOnce('0xcurateHash')
+    waitForTransactionReceipt.mockResolvedValueOnce({ status: 'success' })
 
-    await expect(
-      donateCommand.parseAsync(['article', '--shortHash', 'abc', '--amount', '1'], { from: 'user' }),
-    ).rejects.toThrow('process.exit')
-    expect(console.error).toHaveBeenCalledWith('Article is missing dataHash; cannot construct uri')
+    await donateCommand.parseAsync(['article', '--shortHash', 'abc', '--amount', '1'], { from: 'user' })
+
+    expect(writeContract).toHaveBeenCalledWith(
+      expect.objectContaining({
+        functionName: 'curate',
+        args: ['0xauthor', '0xtoken', 1_000_000n, 'https://matters.town/a/abc'],
+      }),
+    )
   })
 
   it('exits on self-donation', async () => {
