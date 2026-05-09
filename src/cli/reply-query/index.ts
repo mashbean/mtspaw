@@ -1,6 +1,7 @@
 import { Command } from 'commander'
 
 import { fetchGqlWithAuthRetry, readEnvJson, requireEnvJson, requireMattersApi } from '../../services/auth/index.js'
+import { fromGlobalId } from '../../services/gql/index.js'
 import type { ReplyEntry, ReplyPendingJson } from '../../services/reply-pending/index.js'
 import { readReplyPendingJson, writeReplyPendingJson } from '../../services/reply-pending/index.js'
 
@@ -190,6 +191,17 @@ const replyQueryCommand = new Command('reply-query')
       console.error('viewer.id missing')
       process.exit(1)
     }
+    let selfDbId: string
+    try {
+      selfDbId = fromGlobalId(selfId).id
+    } catch {
+      console.error(`Failed to decode viewer.id: ${selfId}`)
+      process.exit(1)
+    }
+    if (!selfDbId) {
+      console.error(`viewer.id decoded to empty: ${selfId}`)
+      process.exit(1)
+    }
 
     const state: ReplyPendingJson = readReplyPendingJson()
 
@@ -218,7 +230,7 @@ const replyQueryCommand = new Command('reply-query')
       }
       const { result, errorMessage } = await fetchGqlWithAuthRetry(envJsonPath, mattersApi, NOTICES_QUERY, {
         input,
-        selfId,
+        selfId: selfDbId,
       })
       if (errorMessage) {
         console.error('reply-query failed:', errorMessage)

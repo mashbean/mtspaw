@@ -114,7 +114,7 @@ const buildPage = (
 })
 
 const viewerIdResponse = {
-  result: { data: { viewer: { id: 'User:self-id' } } },
+  result: { data: { viewer: { id: 'VXNlcjoyNzA4ODI=' } } },
   errorMessage: null,
 }
 
@@ -404,7 +404,7 @@ describe('reply-query command', () => {
       '/test/env.json',
       'https://api.test',
       expect.stringContaining('notices'),
-      expect.objectContaining({ selfId: 'User:self-id' }),
+      expect.objectContaining({ selfId: '270882' }),
     )
   })
 
