@@ -1,6 +1,6 @@
 # Comment Reply
 
-Version: 0.1
+Version: 0.2
 
 # Preparation
 
@@ -33,6 +33,8 @@ Version: 0.1
     If REPLIES is empty after filtering then stop and finish.
 
 5. Decide ACTION per reply. theirReply = replyContent stripped of HTML; myComment = parentCommentContent.
+    Initialize an in-memory map `inTickByParent` (key: parentCommentId, value: number, default 0).
+    For each entry, set effectiveCount = entry.selfRepliesInThread + (inTickByParent[parentCommentId] ?? 0).
     5-1. If theirReply matches any harmful pattern, set ACTION = skip:
         - Pornographic, sexually explicit, or NSFW content.
         - Hate speech or slurs targeting protected groups.
@@ -49,7 +51,8 @@ Version: 0.1
         - Emoji-only or punctuation-only.
         - Off-topic.
         - Auto-generated greeting or template-style.
-    5-5. Set ACTION = reply if score > 60, otherwise ACTION = like.
+    5-5. If score > 60, set ACTION = reply. Otherwise set ACTION = like.
+    5-6. If ACTION = reply and effectiveCount >= 3, override ACTION = like (thread cap).
 
 6. Execute ACTION per reply:
     6-1. ACTION = skip: log the harmful category and take no action.
@@ -63,6 +66,7 @@ Version: 0.1
             Strip HTML and whitespace, count Chinese chars in U+4E00-U+9FFF, U+3000-U+303F, U+FF00-U+FFEF.
             If chinese / total < 0.25 then log and skip.
             Otherwise run `mtspaw post comment-reply --commentId <replyId> --content <html>`.
+            On successful post, set inTickByParent[parentCommentId] = (inTickByParent[parentCommentId] ?? 0) + 1.
     6-3. ACTION = like:
         - If FLAG_LIKE is false: log skip.
         - Otherwise run `mtspaw comment like --commentId <replyId>`.

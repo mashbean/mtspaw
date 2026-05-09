@@ -29,6 +29,7 @@ const buildNotice = (overrides: {
   targetContent?: string
   articleId?: string
   articleState?: string
+  selfReplies?: number
 }) => ({
   cursor: `cursor:${overrides.id}`,
   node: {
@@ -40,6 +41,7 @@ const buildNotice = (overrides: {
       id: overrides.targetId ?? 'Comment:p1',
       content: overrides.targetContent ?? '<p>my comment</p>',
       author: { userName: 'self' },
+      comments: { totalCount: overrides.selfReplies ?? 0 },
       node: { id: overrides.articleId ?? 'Article:a1', state: overrides.articleState ?? 'active' },
     },
     comment: {
@@ -65,6 +67,7 @@ const buildMentionNotice = (overrides: {
   parentAuthorUserName?: string | null
   articleId?: string
   articleState?: string
+  selfReplies?: number
 }) => ({
   cursor: `cursor:${overrides.id}`,
   node: {
@@ -85,6 +88,7 @@ const buildMentionNotice = (overrides: {
               id: overrides.parentId ?? 'Comment:p1',
               content: overrides.parentContent ?? '<p>my comment</p>',
               author: { userName: overrides.parentAuthorUserName ?? 'self' },
+              comments: { totalCount: overrides.selfReplies ?? 0 },
             },
       node: { id: overrides.articleId ?? 'Article:a1', state: overrides.articleState ?? 'active' },
     },
@@ -109,6 +113,11 @@ const buildPage = (
   errorMessage: null,
 })
 
+const viewerIdResponse = {
+  result: { data: { viewer: { id: 'User:self-id' } } },
+  errorMessage: null,
+}
+
 describe('reply-query command', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -119,6 +128,7 @@ describe('reply-query command', () => {
     })
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-05-05T12:00:00.000Z'))
+    vi.mocked(fetchGqlWithAuthRetry).mockResolvedValueOnce(viewerIdResponse)
   })
 
   afterEach(() => {
@@ -146,7 +156,7 @@ describe('reply-query command', () => {
       lastNoticeCreatedAt: '2026-05-05T11:00:00.000Z',
       replies: [],
     })
-    expect(fetchGqlWithAuthRetry).toHaveBeenCalledTimes(1)
+    expect(fetchGqlWithAuthRetry).toHaveBeenCalledTimes(2)
   })
 
   it('subsequent run: appends new entries up to checkpoint', async () => {
@@ -216,6 +226,7 @@ describe('reply-query command', () => {
           parentCommentContent: 'y',
           articleId: 'art',
           articleState: 'active',
+          selfRepliesInThread: 0,
         },
         {
           noticeId: 'Notice:fresh',
@@ -229,6 +240,7 @@ describe('reply-query command', () => {
           parentCommentContent: 'y',
           articleId: 'art',
           articleState: 'active',
+          selfRepliesInThread: 0,
         },
       ],
     })
@@ -282,7 +294,7 @@ describe('reply-query command', () => {
 
     await replyQueryCommand.parseAsync([], { from: 'user' })
 
-    expect(fetchGqlWithAuthRetry).toHaveBeenCalledTimes(2)
+    expect(fetchGqlWithAuthRetry).toHaveBeenCalledTimes(3)
     const writeArg = vi.mocked(writeReplyPendingJson).mock.calls[0][0]
     expect(writeArg.lastNoticeId).toBe('Notice:p1a')
     expect(writeArg.replies.map((r) => r.replyId)).toEqual(['Comment:p1a', 'Comment:p1b', 'Comment:p2a'])
@@ -359,6 +371,41 @@ describe('reply-query command', () => {
 
     const writeArg = vi.mocked(writeReplyPendingJson).mock.calls[0][0]
     expect(writeArg.replies).toEqual([])
+  })
+
+  it('captures selfRepliesInThread from target.comments.totalCount and passes selfId to notices query', async () => {
+    vi.mocked(readReplyPendingJson).mockReturnValue({
+      lastNoticeId: 'Notice:cp',
+      lastNoticeCreatedAt: '2026-05-05T08:00:00.000Z',
+      replies: [],
+    })
+    vi.mocked(fetchGqlWithAuthRetry).mockResolvedValueOnce(
+      buildPage([
+        buildNotice({ id: 'Notice:n1', createdAt: '2026-05-05T11:00:00.000Z', replyId: 'Comment:r1', selfReplies: 4 }),
+        buildMentionNotice({
+          id: 'Notice:m1',
+          createdAt: '2026-05-05T10:00:00.000Z',
+          replyId: 'Comment:m-r1',
+          parentAuthorUserName: 'self',
+          selfReplies: 2,
+        }),
+        buildNotice({ id: 'Notice:cp', createdAt: '2026-05-05T08:00:00.000Z' }),
+      ]),
+    )
+
+    await replyQueryCommand.parseAsync([], { from: 'user' })
+
+    const writeArg = vi.mocked(writeReplyPendingJson).mock.calls[0][0]
+    const byId = Object.fromEntries(writeArg.replies.map((r) => [r.replyId, r.selfRepliesInThread]))
+    expect(byId).toEqual({ 'Comment:r1': 4, 'Comment:m-r1': 2 })
+
+    expect(fetchGqlWithAuthRetry).toHaveBeenNthCalledWith(
+      2,
+      '/test/env.json',
+      'https://api.test',
+      expect.stringContaining('notices'),
+      expect.objectContaining({ selfId: 'User:self-id' }),
+    )
   })
 
   it('--dry-run prints summary and does not write reply-pending.json', async () => {

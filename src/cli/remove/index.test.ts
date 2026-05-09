@@ -83,6 +83,7 @@ describe('remove reply-pending command', () => {
       parentCommentContent: 'y',
       articleId: 'art',
       articleState: 'active',
+      selfRepliesInThread: 0,
     })
 
     vi.mocked(readReplyPendingJson).mockReturnValue({

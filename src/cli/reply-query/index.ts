@@ -6,8 +6,14 @@ import { readReplyPendingJson, writeReplyPendingJson } from '../../services/repl
 
 const TTL_MS = 2 * 24 * 60 * 60 * 1000
 
+const VIEWER_ID_QUERY = `
+  query ViewerId {
+    viewer { id }
+  }
+`
+
 const NOTICES_QUERY = `
-  query ViewerNotices($input: ConnectionArgs!) {
+  query ViewerNotices($input: ConnectionArgs!, $selfId: ID!) {
     viewer {
       notices(input: $input) {
         pageInfo { endCursor hasNextPage }
@@ -23,6 +29,7 @@ const NOTICES_QUERY = `
                 id
                 content
                 author { userName }
+                comments(input: { author: $selfId, first: 1 }) { totalCount }
                 node { ... on Article { id state } }
               }
               comment {
@@ -45,6 +52,7 @@ const NOTICES_QUERY = `
                   id
                   content
                   author { userName }
+                  comments(input: { author: $selfId, first: 1 }) { totalCount }
                 }
                 node { ... on Article { id state } }
               }
@@ -70,10 +78,12 @@ interface NoticeEdge {
       content?: string | null
       createdAt?: string
       author?: { userName?: string | null } | null
+      comments?: { totalCount: number } | null
       parentComment?: {
         id: string
         content?: string | null
         author?: { userName?: string | null } | null
+        comments?: { totalCount: number } | null
       } | null
       node?: { id?: string; state?: string } | null
     } | null
@@ -124,6 +134,7 @@ const toEntry = (edge: NoticeEdge, self: string): ReplyEntry | null => {
       parentCommentContent: target.content ?? '',
       articleId: target.node?.id ?? '',
       articleState: target.node?.state ?? '',
+      selfRepliesInThread: target.comments?.totalCount ?? 0,
     }
   }
 
@@ -148,6 +159,7 @@ const toEntry = (edge: NoticeEdge, self: string): ReplyEntry | null => {
       parentCommentContent: parent.content ?? '',
       articleId: target.node?.id ?? '',
       articleState: target.node?.state ?? '',
+      selfRepliesInThread: parent.comments?.totalCount ?? 0,
     }
   }
 
@@ -163,6 +175,21 @@ const replyQueryCommand = new Command('reply-query')
     const mattersApi = requireMattersApi(envJson)
     const self = (envJson.userName as string | undefined) ?? ''
     const dryRun = !!opts.dryRun
+
+    const { result: viewerResult, errorMessage: viewerErr } = await fetchGqlWithAuthRetry(
+      envJsonPath,
+      mattersApi,
+      VIEWER_ID_QUERY,
+    )
+    if (viewerErr) {
+      console.error('Failed to fetch viewer.id:', viewerErr)
+      process.exit(1)
+    }
+    const selfId = ((viewerResult as { data?: { viewer?: { id?: string } } })?.data?.viewer?.id ?? '').trim()
+    if (!selfId) {
+      console.error('viewer.id missing')
+      process.exit(1)
+    }
 
     const state: ReplyPendingJson = readReplyPendingJson()
 
@@ -189,7 +216,10 @@ const replyQueryCommand = new Command('reply-query')
       if (cursor) {
         input.after = cursor
       }
-      const { result, errorMessage } = await fetchGqlWithAuthRetry(envJsonPath, mattersApi, NOTICES_QUERY, { input })
+      const { result, errorMessage } = await fetchGqlWithAuthRetry(envJsonPath, mattersApi, NOTICES_QUERY, {
+        input,
+        selfId,
+      })
       if (errorMessage) {
         console.error('reply-query failed:', errorMessage)
         process.exit(1)

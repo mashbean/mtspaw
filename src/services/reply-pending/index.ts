@@ -13,6 +13,7 @@ interface ReplyEntry {
   parentCommentContent: string
   articleId: string
   articleState: string
+  selfRepliesInThread: number
 }
 
 interface ReplyPendingJson {
