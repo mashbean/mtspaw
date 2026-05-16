@@ -82,6 +82,7 @@ interface Spammers {
 
 const STATE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const OCCURRENCES_CAP = 10
+const USERS_CAP = 100
 
 const channelsPath = () => path.resolve(process.cwd(), 'spam-scan-channels.json')
 const statePath = () => path.resolve(process.cwd(), 'spam-scan-state.json')
@@ -142,10 +143,35 @@ const writeSpammers = (data: Spammers) => {
   fs.writeFileSync(spammersPath(), JSON.stringify(data, null, 2))
 }
 
+const MIN_MEANINGFUL_LENGTH = 5
+
+const isCommentBenign = (content: string): boolean => {
+  const trimmed = content.trim()
+  if (trimmed.length === 0) {
+    return true
+  }
+  if (/https?:\/\//i.test(trimmed)) {
+    return false
+  }
+  if (trimmed.length < MIN_MEANINGFUL_LENGTH) {
+    return true
+  }
+  const hasAlnum = /[a-zA-Z0-9]/.test(trimmed)
+  const hasCJK = /[一-鿿぀-ヿ가-힯]/.test(trimmed)
+  if (!hasAlnum && !hasCJK) {
+    return true
+  }
+  return false
+}
+
 const stripHtml = (html: string): string => {
   return html
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<a\b[^>]*?\bhref=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (_, href: string, text: string) => {
+      const inner = text.replace(/<[^>]+>/g, '').trim()
+      return inner ? `${inner} (${href})` : href
+    })
     .replace(/<\/p>/gi, '\n')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<[^>]+>/g, '')
@@ -170,7 +196,17 @@ const formatTime = (iso: string | null | undefined): string => {
   }
   const shifted = new Date(d.getTime() + 8 * 60 * 60 * 1000)
   const pad = (n: number) => String(n).padStart(2, '0')
-  return `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())} ${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())}`
+  return `${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())} ${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())}`
+}
+
+const formatOccurrence = (o: SpammerOccurrence): string => {
+  const when = formatTime(o.foundAt)
+  if (o.type === 'comment') {
+    const url = `https://matters.town/a/${o.shortHash}#comment-${o.contentId}`
+    return `${when}  評論  <${url}|${o.contentId}>`
+  }
+  const url = `https://matters.town/a/${o.shortHash}`
+  return `${when}  文章  <${url}|${o.shortHash}>`
 }
 
 const formatUnreportedReport = (users: Record<string, SpammerUser>): { text: string; userNames: string[] } => {
@@ -180,15 +216,13 @@ const formatUnreportedReport = (users: Record<string, SpammerUser>): { text: str
   }
   const lines: string[] = []
   for (const [userName, user] of entries) {
-    lines.push(`*@${userName} (${user.displayName})*`)
-    lines.push(
-      `first: ${formatTime(user.firstSeenAt)}  last: ${formatTime(user.lastSeenAt)}  Spam 次數: ${user.occurrences.length}`,
-    )
-    if (user.communityWatchHistory.seen) {
-      lines.push(`community watch: handled at ${formatTime(user.communityWatchHistory.lastSeenAt)}`)
-    }
-    for (const o of user.occurrences) {
-      lines.push(`${formatTime(o.foundAt)}  ${o.type}  ${o.shortHash}`)
+    lines.push(`<https://matters.town/@${userName}|@${userName}> (${user.displayName})`)
+    const count = user.occurrences.length >= OCCURRENCES_CAP ? `${OCCURRENCES_CAP}+` : `${user.occurrences.length}`
+    const cwMark = user.communityWatchHistory.seen ? '  守望相助檢舉過' : ''
+    lines.push(`Spam 次數: ${count}${cwMark}`)
+    const sorted = [...user.occurrences].sort((a, b) => Date.parse(b.foundAt) - Date.parse(a.foundAt))
+    for (const o of sorted) {
+      lines.push(formatOccurrence(o))
     }
     lines.push('')
   }
@@ -198,6 +232,7 @@ const formatUnreportedReport = (users: Record<string, SpammerUser>): { text: str
 export {
   channelsPath,
   formatUnreportedReport,
+  isCommentBenign,
   OCCURRENCES_CAP,
   pendingPath,
   prunedState,
@@ -209,6 +244,7 @@ export {
   STATE_TTL_MS,
   statePath,
   stripHtml,
+  USERS_CAP,
   writePending,
   writeSpammers,
   writeState,

@@ -1,6 +1,6 @@
 # Spam Scan
 
-Version: 0.4
+Version: 0.6
 
 # Preparation
 
@@ -35,10 +35,14 @@ Version: 0.4
             - Run `mtspaw spam-scan mark-scanned --articleId <articleId> --shortHash <shortHash> --spam`.
             - Skip 4-2 and 4-3 for this article; jump to 4-4.
     4-2. For each comment in `comments`:
-        - If `communityWatchAction` is non-null, run `mtspaw spam-scan note-cw --userName <author.userName>
-          --uuid <communityWatchAction.uuid> --createdAt <communityWatchAction.createdAt>` (no-op when the
-          author is not yet in the roster).
-        - Judge `content` against the same five categories. On any hit, run
+        - If `communityWatchAction` is non-null, the matters server has already flagged this comment as
+          spam. Skip the LLM judgement and instead:
+            - Run `mtspaw spam-scan record --userName <author.userName> --displayName <author.displayName>
+              --type comment --contentId <commentId> --shortHash <article.shortHash>`.
+            - Run `mtspaw spam-scan note-cw --userName <author.userName>
+              --uuid <communityWatchAction.uuid> --createdAt <communityWatchAction.createdAt>`.
+            - Continue to the next comment.
+        - Otherwise, judge `content` against the same five categories. On any hit, run
           `mtspaw spam-scan record --userName <author.userName> --displayName <author.displayName>
           --type comment --contentId <commentId> --shortHash <article.shortHash>`.
     4-3. After all comments are judged, run
@@ -48,5 +52,8 @@ Version: 0.4
 
 5. Clear spam-pending.json by writing `{ "articles": [] }`.
 
-6. Run `mtspaw spam-scan report` to forward unreported spammers to Slack
+6. Run `mtspaw spam-scan cleanup` to remove archived/banned/missing spammers
+    from spammers.json. Queries matters API for each user with 1s throttle.
+
+7. Run `mtspaw spam-scan report` to forward unreported spammers to Slack
     and mark them reported on successful delivery. Skip silently when none.

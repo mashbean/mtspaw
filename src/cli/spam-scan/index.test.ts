@@ -8,6 +8,14 @@ vi.mock('../../services/auth/index.js', () => ({
   requireMattersApi: vi.fn((envJson: Record<string, unknown>) => envJson.mattersApi as string),
   fetchGqlWithAuthRetry: vi.fn(),
 }))
+vi.mock('../../services/gql/index.js', async () => {
+  const actual = await vi.importActual<typeof import('../../services/gql/index.js')>('../../services/gql/index.js')
+  return {
+    ...actual,
+    fetchGql: vi.fn(),
+    delay: vi.fn(() => Promise.resolve()),
+  }
+})
 vi.mock('@inquirer/prompts', () => ({
   input: vi.fn(),
 }))
@@ -34,6 +42,7 @@ vi.mock('node:fs', () => {
 import { input } from '@inquirer/prompts'
 
 import { fetchGqlWithAuthRetry, readEnvJson } from '../../services/auth/index.js'
+import { delay, fetchGql } from '../../services/gql/index.js'
 import { spamScanCommand } from './index.js'
 
 interface FsMockShape {
@@ -207,7 +216,7 @@ describe('spam-scan query command', () => {
                     node: {
                       id: 'Comment:old',
                       state: 'active',
-                      content: '<p>old</p>',
+                      content: '<p>old comment text</p>',
                       createdAt: '2026-05-15T09:00:00.000Z',
                       author: { id: 'User:x', userName: 'eve', displayName: 'Eve' },
                       communityWatchAction: null,
@@ -218,7 +227,7 @@ describe('spam-scan query command', () => {
                     node: {
                       id: 'Comment:new',
                       state: 'active',
-                      content: '<p>new</p>',
+                      content: '<p>new comment text</p>',
                       createdAt: '2026-05-15T11:00:00.000Z',
                       author: { id: 'User:y', userName: 'mallory', displayName: 'Mallory' },
                       communityWatchAction: null,
@@ -292,7 +301,7 @@ describe('spam-scan query command', () => {
                     node: {
                       id: 'Comment:c1',
                       state: 'active',
-                      content: '<p>hi</p>',
+                      content: '<p>hi there reader</p>',
                       createdAt: '2026-05-15T11:00:00.000Z',
                       author: { id: 'User:u2', userName: 'bob', displayName: 'Bob' },
                       communityWatchAction: null,
@@ -400,6 +409,66 @@ describe('spam-scan record command', () => {
       ),
     ).rejects.toThrow('process.exit')
     expect(console.error).toHaveBeenCalledWith('--type must be article or comment')
+  })
+
+  it('flips reported back to false when adding a new occurrence to a previously reported user', async () => {
+    setFile(spammersPath, {
+      users: {
+        alice: {
+          displayName: 'Alice',
+          firstSeenAt: '2026-05-01T00:00:00.000Z',
+          lastSeenAt: '2026-05-01T00:00:00.000Z',
+          occurrences: [],
+          reported: true,
+          communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+        },
+      },
+    })
+
+    await spamScanCommand.parseAsync(
+      ['record', '--userName', 'alice', '--type', 'comment', '--contentId', 'Comment:new', '--shortHash', 'shN'],
+      { from: 'user' },
+    )
+
+    const data = readFile(spammersPath) as { users: Record<string, { reported: boolean }> }
+    expect(data.users.alice.reported).toBe(false)
+  })
+
+  it('rotates roster by LRU when a new user pushes count over USERS_CAP', async () => {
+    const existing: Record<string, unknown> = {}
+    for (let i = 0; i < 100; i += 1) {
+      existing[`user${String(i).padStart(3, '0')}`] = {
+        displayName: '',
+        firstSeenAt: '2026-05-01T00:00:00.000Z',
+        lastSeenAt: `2026-05-01T${String(i).padStart(2, '0')}:00:00.000Z`,
+        occurrences: [],
+        reported: false,
+        communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+      }
+    }
+    setFile(spammersPath, { users: existing })
+
+    await spamScanCommand.parseAsync(
+      ['record', '--userName', 'newcomer', '--type', 'comment', '--contentId', 'Comment:n', '--shortHash', 'shN'],
+      { from: 'user' },
+    )
+
+    const data = readFile(spammersPath) as { users: Record<string, unknown> }
+    const names = Object.keys(data.users)
+    expect(names).toHaveLength(100)
+    expect(names).toContain('newcomer')
+    expect(names).not.toContain('user000')
+    expect(names).toContain('user099')
+  })
+
+  it('does not rotate when adding a new user keeps count at or below USERS_CAP', async () => {
+    setFile(spammersPath, { users: {} })
+    await spamScanCommand.parseAsync(
+      ['record', '--userName', 'first', '--type', 'comment', '--contentId', 'x', '--shortHash', 'h'],
+      { from: 'user' },
+    )
+    const data = readFile(spammersPath) as { users: Record<string, unknown> }
+    expect(Object.keys(data.users)).toEqual(['first'])
   })
 })
 
@@ -589,12 +658,37 @@ describe('spam-scan list-unreported command', () => {
 
     expect(vi.mocked(console.log).mock.calls).toHaveLength(1)
     const out = vi.mocked(console.log).mock.calls[0][0] as string
-    expect(out).toContain('*@alice (Alice)*')
-    expect(out).toContain('community watch: handled at 2026-05-15 18:00')
-    expect(out).toContain('Spam 次數: 1')
-    expect(out).toContain('2026-05-15 08:00  comment  sh1')
-    expect(out).not.toContain('Comment:c1')
+    expect(out).toContain('<https://matters.town/@alice|@alice> (Alice)')
+    expect(out).toContain('Spam 次數: 1  守望相助檢舉過')
+    expect(out).toContain('05-15 08:00  評論  <https://matters.town/a/sh1#comment-Comment:c1|Comment:c1>')
     expect(out).not.toContain('@skipme')
+    expect(out).not.toContain('first:')
+    expect(out).not.toContain('last:')
+  })
+
+  it('shows "10+" for Spam 次數 when occurrences hit the rotation cap', async () => {
+    setFile(spammersPath, {
+      users: {
+        capped: {
+          displayName: 'Capped',
+          firstSeenAt: '2026-05-10T00:00:00.000Z',
+          lastSeenAt: '2026-05-15T00:00:00.000Z',
+          occurrences: Array.from({ length: 10 }, (_, i) => ({
+            type: 'comment',
+            contentId: `Comment:c${i}`,
+            shortHash: 'sh',
+            foundAt: `2026-05-1${i % 5}T00:00:00.000Z`,
+          })),
+          reported: false,
+          communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+        },
+      },
+    })
+
+    await spamScanCommand.parseAsync(['list-unreported'], { from: 'user' })
+
+    const out = vi.mocked(console.log).mock.calls[0][0] as string
+    expect(out).toContain('Spam 次數: 10+')
   })
 })
 
@@ -798,7 +892,7 @@ describe('spam-scan report command', () => {
     expect(headers.Authorization).toBe('Bearer xoxb-1')
     const body = JSON.parse(init.body as string) as { channel: string; text: string }
     expect(body.channel).toBe('C123')
-    expect(body.text).toContain('*@alice (Alice)*')
+    expect(body.text).toContain('<https://matters.town/@alice|@alice> (Alice)')
     expect(body.text).not.toContain('@bob')
 
     const data = readFile(spammersPath) as { users: Record<string, { reported: boolean }> }
@@ -823,5 +917,94 @@ describe('spam-scan report command', () => {
 
     const data = readFile(spammersPath) as { users: Record<string, { reported: boolean }> }
     expect(data.users.alice.reported).toBe(false)
+  })
+})
+
+describe('spam-scan cleanup command', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    fsStore.clear()
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit')
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const makeUser = () => ({
+    displayName: 'X',
+    firstSeenAt: '2026-05-01T00:00:00.000Z',
+    lastSeenAt: '2026-05-01T00:00:00.000Z',
+    occurrences: [],
+    reported: false,
+    communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+  })
+
+  it('removes archived, banned, and missing users; keeps active and frozen', async () => {
+    setFile(spammersPath, {
+      users: {
+        alice: makeUser(),
+        bob: makeUser(),
+        carol: makeUser(),
+        dave: makeUser(),
+        eve: makeUser(),
+      },
+    })
+
+    vi.mocked(fetchGql)
+      .mockResolvedValueOnce({ data: { user: { status: { state: 'active' } } } })
+      .mockResolvedValueOnce({ data: { user: { status: { state: 'archived' } } } })
+      .mockResolvedValueOnce({ data: { user: { status: { state: 'banned' } } } })
+      .mockResolvedValueOnce({ data: { user: null } })
+      .mockResolvedValueOnce({ data: { user: { status: { state: 'frozen' } } } })
+
+    await spamScanCommand.parseAsync(['cleanup'], { from: 'user' })
+
+    const data = readFile(spammersPath) as { users: Record<string, unknown> }
+    expect(Object.keys(data.users).sort()).toEqual(['alice', 'eve'])
+    expect(console.log).toHaveBeenCalledWith(
+      'cleanup: kept 2, removed 3 (archived: 1, banned: 1, missing: 1), errors: 0',
+    )
+  })
+
+  it('keeps user when GraphQL returns errors', async () => {
+    setFile(spammersPath, { users: { alice: makeUser() } })
+
+    vi.mocked(fetchGql).mockResolvedValueOnce({ errors: [{ message: 'transient' }] })
+
+    await spamScanCommand.parseAsync(['cleanup'], { from: 'user' })
+
+    const data = readFile(spammersPath) as { users: Record<string, unknown> }
+    expect(Object.keys(data.users)).toEqual(['alice'])
+    expect(console.error).toHaveBeenCalledWith('cleanup: @alice lookup failed: transient')
+  })
+
+  it('delays 1 second between lookups but not before the first', async () => {
+    setFile(spammersPath, {
+      users: {
+        alice: makeUser(),
+        bob: makeUser(),
+        carol: makeUser(),
+      },
+    })
+
+    vi.mocked(fetchGql).mockResolvedValue({ data: { user: { status: { state: 'active' } } } })
+
+    await spamScanCommand.parseAsync(['cleanup'], { from: 'user' })
+
+    expect(vi.mocked(delay).mock.calls).toEqual([[1000], [1000]])
+  })
+
+  it('exits silently when roster is empty', async () => {
+    setFile(spammersPath, { users: {} })
+
+    await spamScanCommand.parseAsync(['cleanup'], { from: 'user' })
+
+    expect(fetchGql).not.toHaveBeenCalled()
+    expect(console.log).toHaveBeenCalledWith('cleanup: roster is empty, nothing to check')
   })
 })

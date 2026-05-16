@@ -300,10 +300,12 @@ mtspaw spam-scan list-unreported
 mtspaw spam-scan mark-reported --userName <name>
 mtspaw spam-scan mark-reported --all
 mtspaw spam-scan report
+mtspaw spam-scan cleanup
 ```
 
-`query` reads `spam-scan-channels.json`, walks each feed for 10 articles plus up to 5 top-level and 5
-nested comments each, and writes `spam-pending.json` for the playbook to judge. Article entries already
+`query` reads `spam-scan-channels.json`, walks each feed for 10 articles plus up to 3 top-level and 3
+nested comments each, and writes `spam-pending.json` for the playbook to judge. Comments that strip to
+empty / short / emoji-only / pure punctuation without a URL are filtered out before reaching the LLM. Article entries already
 flagged spam within the 7-day TTL are skipped; non-spam articles are re-visited with only newer comments.
 Pass `--dry-run` to fetch and print a per-feed summary plus the would-be enqueue list without writing
 `spam-pending.json`.
@@ -311,7 +313,9 @@ Pass `--dry-run` to fetch and print a per-feed summary plus the would-be enqueue
 `spam-scan-channels.json` is seeded by `init-agent` with icymi, hottest, and seven curated channel
 shortHashes. The operator edits this file to tune coverage.
 
-`record` appends an occurrence under a user in `spammers.json`, rotating at 10 entries.
+`record` appends an occurrence under a user in `spammers.json`, rotating at 10 entries. The roster itself
+caps at 100 users; when a new user pushes count over the cap, the user with the oldest `lastSeenAt` is
+evicted (LRU).
 `mark-scanned` upserts the article state and prunes entries older than 7 days.
 `note-cw` updates `communityWatchHistory` on an existing roster entry; it is a no-op when the user is
 not already in the roster.
@@ -323,6 +327,12 @@ pipeline forwards `list-unreported` output and runs `mark-reported --all` on suc
 `report` is the integrated Slack flow: it builds the same plain-text body as `list-unreported`, POSTs
 to `https://slack.com/api/chat.postMessage` with the bearer token, and flips `reported: true` on every
 included user only when Slack returns `ok: true`. Exits 0 silently when there are no unreported entries.
+
+`cleanup` walks every spammer in `spammers.json`, looks up `user(input: { userName }).status.state` on
+the matters API with a 1-second throttle between calls, and removes entries whose state is `archived`,
+`banned`, or whose user lookup returns null (hard-deleted / never existed). Active and frozen entries
+are kept. The playbook runs this between clearing pending and sending the report so the Slack message
+never includes already-banned spammers.
 
 ### Global options
 

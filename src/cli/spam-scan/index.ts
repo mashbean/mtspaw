@@ -2,6 +2,7 @@ import { input } from '@inquirer/prompts'
 import { Command } from 'commander'
 
 import { fetchGqlWithAuthRetry, readEnvJson, requireEnvJson, requireMattersApi } from '../../services/auth/index.js'
+import { delay, fetchGql, formatGqlErrors } from '../../services/gql/index.js'
 import type {
   AuthorRef,
   ChannelFeed,
@@ -15,20 +16,22 @@ import type {
 } from '../../services/spam-scan/index.js'
 import {
   formatUnreportedReport,
+  isCommentBenign,
   OCCURRENCES_CAP,
   prunedState,
   readChannels,
   readSpammers,
   readState,
   stripHtml,
+  USERS_CAP,
   writePending,
   writeSpammers,
   writeState,
 } from '../../services/spam-scan/index.js'
 
 const PER_FEED_ARTICLE_COUNT = 10
-const TOP_LEVEL_COMMENT_COUNT = 5
-const NESTED_COMMENT_COUNT = 5
+const TOP_LEVEL_COMMENT_COUNT = 3
+const NESTED_COMMENT_COUNT = 3
 
 const ICYMI_QUERY = `
   query SpamScanIcymi($input: ConnectionArgs!) {
@@ -104,6 +107,14 @@ const CHANNEL_QUERY = `
           }
         }
       }
+    }
+  }
+`
+
+const USER_STATE_QUERY = `
+  query SpamScanUserState($input: UserInput!) {
+    user(input: $input) {
+      status { state }
     }
   }
 `
@@ -272,6 +283,18 @@ const toAuthorRef = (author: RawComment['author'] | RawArticle['author']): Autho
 
 const flattenComments = (raw: RawComment[], cutoffMs: number): PendingComment[] => {
   const out: PendingComment[] = []
+  const addIf = (
+    id: string,
+    content: string,
+    author: AuthorRef,
+    depth: 'top' | 'reply',
+    cw: PendingCommentCW | null,
+  ) => {
+    if (!cw && isCommentBenign(content)) {
+      return
+    }
+    out.push({ commentId: id, content, author, depth, communityWatchAction: cw })
+  }
   for (const top of raw) {
     if (top.state !== 'active') {
       continue
@@ -282,13 +305,7 @@ const flattenComments = (raw: RawComment[], cutoffMs: number): PendingComment[] 
     }
     const createdAtMs = Date.parse(top.createdAt)
     if (Number.isFinite(createdAtMs) && createdAtMs > cutoffMs) {
-      out.push({
-        commentId: top.id,
-        content: stripHtml(top.content ?? ''),
-        author,
-        depth: 'top',
-        communityWatchAction: top.communityWatchAction ?? null,
-      })
+      addIf(top.id, stripHtml(top.content ?? ''), author, 'top', top.communityWatchAction ?? null)
     }
     const nestedEdges = top.comments?.edges ?? []
     for (const edge of nestedEdges) {
@@ -302,13 +319,7 @@ const flattenComments = (raw: RawComment[], cutoffMs: number): PendingComment[] 
       }
       const nestedCreatedMs = Date.parse(nested.createdAt)
       if (Number.isFinite(nestedCreatedMs) && nestedCreatedMs > cutoffMs) {
-        out.push({
-          commentId: nested.id,
-          content: stripHtml(nested.content ?? ''),
-          author: nestedAuthor,
-          depth: 'reply',
-          communityWatchAction: nested.communityWatchAction ?? null,
-        })
+        addIf(nested.id, stripHtml(nested.content ?? ''), nestedAuthor, 'reply', nested.communityWatchAction ?? null)
       }
     }
   }
@@ -463,6 +474,7 @@ const recordCommand = new Command('record')
         if (existing.occurrences.length > OCCURRENCES_CAP) {
           existing.occurrences = existing.occurrences.slice(-OCCURRENCES_CAP)
         }
+        existing.reported = false
       } else {
         spammers.users[userName] = {
           displayName,
@@ -471,6 +483,16 @@ const recordCommand = new Command('record')
           occurrences: [occurrence],
           reported: false,
           communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+        }
+        const names = Object.keys(spammers.users)
+        if (names.length > USERS_CAP) {
+          const sortedByLastSeen = [...names].sort(
+            (a, b) => Date.parse(spammers.users[a].lastSeenAt) - Date.parse(spammers.users[b].lastSeenAt),
+          )
+          const toEvict = sortedByLastSeen.slice(0, names.length - USERS_CAP)
+          for (const name of toEvict) {
+            delete spammers.users[name]
+          }
         }
       }
 
@@ -533,6 +555,88 @@ const listUnreportedCommand = new Command('list-unreported')
       return
     }
     console.log(text)
+  })
+
+const USER_LOOKUP_INTERVAL_MS = 1000
+
+interface UserStateResult {
+  found: boolean
+  state: 'active' | 'banned' | 'archived' | 'frozen' | null
+  errorMessage: string | null
+}
+
+const fetchUserState = async (mattersApi: string, userName: string): Promise<UserStateResult> => {
+  const result = (await fetchGql(mattersApi, USER_STATE_QUERY, { input: { userName } })) as {
+    data?: { user?: { status?: { state?: 'active' | 'banned' | 'archived' | 'frozen' } } | null }
+    errors?: { message: string }[]
+  }
+  const errorMessage = formatGqlErrors(result)
+  if (errorMessage) {
+    return { found: false, state: null, errorMessage }
+  }
+  const user = result.data?.user
+  if (!user) {
+    return { found: false, state: null, errorMessage: null }
+  }
+  return { found: true, state: user.status?.state ?? null, errorMessage: null }
+}
+
+const cleanupCommand = new Command('cleanup')
+  .description('Remove archived/banned/missing spammers from spammers.json by checking matters API')
+  .action(async () => {
+    const envJsonPath = requireEnvJson()
+    const envJson = readEnvJson(envJsonPath)
+    const mattersApi = requireMattersApi(envJson)
+
+    const spammers = readSpammers()
+    const userNames = Object.keys(spammers.users)
+    if (userNames.length === 0) {
+      console.log('cleanup: roster is empty, nothing to check')
+      return
+    }
+
+    let kept = 0
+    let archived = 0
+    let banned = 0
+    let missing = 0
+    let errored = 0
+
+    for (let i = 0; i < userNames.length; i += 1) {
+      const userName = userNames[i]
+      if (i > 0) {
+        await delay(USER_LOOKUP_INTERVAL_MS)
+      }
+      const result = await fetchUserState(mattersApi, userName)
+      if (result.errorMessage) {
+        console.error(`cleanup: @${userName} lookup failed: ${result.errorMessage}`)
+        errored += 1
+        continue
+      }
+      if (!result.found) {
+        delete spammers.users[userName]
+        missing += 1
+        continue
+      }
+      if (result.state === 'archived') {
+        delete spammers.users[userName]
+        archived += 1
+        continue
+      }
+      if (result.state === 'banned') {
+        delete spammers.users[userName]
+        banned += 1
+        continue
+      }
+      kept += 1
+    }
+
+    const removed = archived + banned + missing
+    if (removed > 0) {
+      writeSpammers(spammers)
+    }
+    console.log(
+      `cleanup: kept ${kept}, removed ${removed} (archived: ${archived}, banned: ${banned}, missing: ${missing}), errors: ${errored}`,
+    )
   })
 
 const SLACK_API = 'https://slack.com/api/chat.postMessage'
@@ -653,5 +757,6 @@ spamScanCommand.addCommand(noteCwCommand)
 spamScanCommand.addCommand(listUnreportedCommand)
 spamScanCommand.addCommand(markReportedCommand)
 spamScanCommand.addCommand(reportCommand)
+spamScanCommand.addCommand(cleanupCommand)
 
-export { buildArticleCommentsQuery, CHANNEL_QUERY, HOTTEST_QUERY, ICYMI_QUERY, spamScanCommand }
+export { buildArticleCommentsQuery, CHANNEL_QUERY, HOTTEST_QUERY, ICYMI_QUERY, spamScanCommand, USER_STATE_QUERY }
