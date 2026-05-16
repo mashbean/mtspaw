@@ -1,10 +1,9 @@
 # Spam Scan
 
-Version: 0.2
+Version: 0.3
 
 # Preparation
 
-0. Randomly delay n seconds (60 <= n < 300) before proceeding.
 1. Run `mtspaw -V` and make sure it's working.
 2. Run `mtspaw sync-schema` to get the newest API schema.
 3. Make sure ./env.json and ./spam-scan-channels.json exist.
@@ -44,7 +43,7 @@ Version: 0.2
           --type comment --contentId <commentId> --shortHash <article.shortHash>`.
     4-3. After all comments are judged, run `mtspaw spam-scan mark-scanned --articleId <articleId>`
         (without --spam) to update lastScannedAt for the next visit.
-    4-4. Randomly pause n seconds (30 <= n < 180) before the next article.
+    4-4. Pause 1 second before the next article.
 
 5. Clear spam-pending.json by writing `{ "articles": [] }`.
 
