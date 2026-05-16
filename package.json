@@ -1,6 +1,6 @@
 {
   "name": "mtspaw",
-  "version": "0.1.31",
+  "version": "0.1.32",
   "type": "module",
   "description": "",
   "bin": {
@@ -12,7 +12,8 @@
     "lint:fix": "eslint . --fix",
     "prepare": "husky",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:live": "vitest run --config vitest.live.config.ts"
   },
   "keywords": [],
   "author": "",

@@ -212,7 +212,7 @@ const fetchFeedArticles = async (envJsonPath: string, mattersApi: string, feed: 
   if (feed.type === 'channel' && feed.shortHash) {
     const { result, errorMessage } = await fetchGqlWithAuthRetry(envJsonPath, mattersApi, CHANNEL_QUERY, {
       input: { shortHash: feed.shortHash },
-      articlesInput: { first: PER_FEED_ARTICLE_COUNT, sort: 'newest' },
+      articlesInput: { first: PER_FEED_ARTICLE_COUNT },
     })
     if (errorMessage) {
       console.error(`feed channel ${feed.shortHash} failed: ${errorMessage}`)
@@ -232,12 +232,12 @@ interface FetchCommentsResult {
 const fetchArticleComments = async (
   envJsonPath: string,
   mattersApi: string,
-  articleId: string,
+  shortHash: string,
   cwSupported: boolean,
 ): Promise<FetchCommentsResult> => {
   const query = buildArticleCommentsQuery(cwSupported)
   const { result, errorMessage } = await fetchGqlWithAuthRetry(envJsonPath, mattersApi, query, {
-    input: { id: articleId },
+    input: { shortHash },
     topInput: {
       first: TOP_LEVEL_COMMENT_COUNT,
       sort: 'newest',
@@ -250,7 +250,7 @@ const fetchArticleComments = async (
     if (cwSupported && errorMentionsCw(errorMessage)) {
       return { comments: [], cwUnsupported: true }
     }
-    console.error(`article ${articleId} comments failed: ${errorMessage}`)
+    console.error(`article ${shortHash} comments failed: ${errorMessage}`)
     return { comments: [], cwUnsupported: false }
   }
 
@@ -365,11 +365,11 @@ const queryCommand = new Command('query')
         const needsArticleJudgement = !entry
         const cutoffMs = entry ? Date.parse(entry.lastScannedAt) : 0
 
-        let fetched = await fetchArticleComments(envJsonPath, mattersApi, article.id, cwSupported)
+        let fetched = await fetchArticleComments(envJsonPath, mattersApi, article.shortHash, cwSupported)
         if (fetched.cwUnsupported) {
           cwSupported = false
           console.log('communityWatchAction field unsupported, retrying without it')
-          fetched = await fetchArticleComments(envJsonPath, mattersApi, article.id, false)
+          fetched = await fetchArticleComments(envJsonPath, mattersApi, article.shortHash, false)
         }
 
         const comments = flattenComments(fetched.comments, Number.isFinite(cutoffMs) ? cutoffMs : 0)
@@ -654,4 +654,4 @@ spamScanCommand.addCommand(listUnreportedCommand)
 spamScanCommand.addCommand(markReportedCommand)
 spamScanCommand.addCommand(reportCommand)
 
-export { spamScanCommand }
+export { buildArticleCommentsQuery, CHANNEL_QUERY, HOTTEST_QUERY, ICYMI_QUERY, spamScanCommand }
