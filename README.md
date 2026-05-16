@@ -292,7 +292,7 @@ Periodically scans configured feeds for spam articles and comments, accumulates 
 in `spammers.json`, and produces plain-text output for an external telegram pipeline.
 
 ```
-mtspaw spam-scan query
+mtspaw spam-scan query [--dry-run]
 mtspaw spam-scan record --userName <name> --displayName <name> --type article|comment --contentId <id> --shortHash <hash>
 mtspaw spam-scan mark-scanned --articleId <id> --shortHash <hash> [--spam]
 mtspaw spam-scan note-cw --userName <name> --uuid <uuid> --createdAt <iso>
@@ -305,6 +305,8 @@ mtspaw spam-scan report
 `query` reads `spam-scan-channels.json`, walks each feed for 10 articles plus up to 5 top-level and 5
 nested comments each, and writes `spam-pending.json` for the playbook to judge. Article entries already
 flagged spam within the 7-day TTL are skipped; non-spam articles are re-visited with only newer comments.
+Pass `--dry-run` to fetch and print a per-feed summary plus the would-be enqueue list without writing
+`spam-pending.json`.
 
 `spam-scan-channels.json` is seeded by `init-agent` with icymi, hottest, and seven curated channel
 shortHashes. The operator edits this file to tune coverage.

@@ -252,6 +252,69 @@ describe('spam-scan query command', () => {
     expect(kept.content).toBeUndefined()
     expect(kept.comments.map((c) => c.commentId)).toEqual(['Comment:new'])
   })
+
+  it('--dry-run fetches but does not write spam-pending.json', async () => {
+    setFile(channelsPath, { feeds: [{ type: 'icymi' }] })
+
+    vi.mocked(fetchGqlWithAuthRetry)
+      .mockResolvedValueOnce({
+        result: {
+          data: {
+            viewer: {
+              recommendation: {
+                icymi: {
+                  edges: [
+                    {
+                      node: {
+                        id: 'Article:a1',
+                        shortHash: 'ah1',
+                        title: 'A1 title',
+                        state: 'active',
+                        author: { id: 'User:u1', userName: 'alice', displayName: 'Alice' },
+                        contents: { html: '<p>body</p>' },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+        errorMessage: null,
+      })
+      .mockResolvedValueOnce({
+        result: {
+          data: {
+            article: {
+              comments: {
+                edges: [
+                  {
+                    node: {
+                      id: 'Comment:c1',
+                      state: 'active',
+                      content: '<p>hi</p>',
+                      createdAt: '2026-05-15T11:00:00.000Z',
+                      author: { id: 'User:u2', userName: 'bob', displayName: 'Bob' },
+                      communityWatchAction: null,
+                      comments: { edges: [] },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+        errorMessage: null,
+      })
+
+    await spamScanCommand.parseAsync(['query', '--dry-run'], { from: 'user' })
+
+    expect(fsStore.has(pendingPath)).toBe(false)
+    const logged = vi.mocked(console.log).mock.calls.map((c) => c[0] as string)
+    expect(logged).toContain('--- spam-scan query dry-run (no write) ---')
+    expect(logged.some((l) => l.includes('would enqueue: 1 articles'))).toBe(true)
+    expect(logged.some((l) => l.includes('Article:a1') && l.includes('shortHash=ah1'))).toBe(true)
+  })
 })
 
 describe('spam-scan record command', () => {

@@ -315,9 +315,18 @@ const flattenComments = (raw: RawComment[], cutoffMs: number): PendingComment[] 
   return out
 }
 
+const feedLabel = (feed: ChannelFeed): string => {
+  if (feed.type === 'channel') {
+    return `channel(${feed.shortHash ?? '?'})`
+  }
+  return feed.type
+}
+
 const queryCommand = new Command('query')
   .description('Fetch articles and comments from configured feeds into spam-pending.json')
-  .action(async () => {
+  .option('--dry-run', 'Fetch and print would-be enqueue summary; do not write spam-pending.json')
+  .action(async (opts: { dryRun?: boolean }) => {
+    const dryRun = !!opts.dryRun
     const envJsonPath = requireEnvJson()
     const envJson = readEnvJson(envJsonPath)
     const mattersApi = requireMattersApi(envJson)
@@ -333,10 +342,12 @@ const queryCommand = new Command('query')
 
     const pending: SpamPending = { articles: [] }
     const seenArticleIds = new Set<string>()
+    const perFeedCounts: { label: string; count: number }[] = []
     let cwSupported = true
 
     for (const feed of channels.feeds) {
       const articles = await fetchFeedArticles(envJsonPath, mattersApi, feed)
+      perFeedCounts.push({ label: feedLabel(feed), count: articles.length })
       for (const article of articles) {
         if (seenArticleIds.has(article.id)) {
           continue
@@ -380,6 +391,22 @@ const queryCommand = new Command('query')
         }
         pending.articles.push(pendingArticle)
       }
+    }
+
+    if (dryRun) {
+      console.log('--- spam-scan query dry-run (no write) ---')
+      console.log(`cwSupported: ${cwSupported}`)
+      console.log('per-feed articles fetched:')
+      for (const f of perFeedCounts) {
+        console.log(`  - ${f.label}: ${f.count}`)
+      }
+      console.log(`would enqueue: ${pending.articles.length} articles`)
+      for (const a of pending.articles) {
+        const title = a.title.length > 80 ? `${a.title.slice(0, 80)}...` : a.title
+        console.log(`  - ${a.articleId} shortHash=${a.shortHash} title=${title}`)
+        console.log(`    needsArticleJudgement: ${a.needsArticleJudgement}  comments: ${a.comments.length}`)
+      }
+      return
     }
 
     writePending(pending)
