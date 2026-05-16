@@ -12,6 +12,7 @@ interface SpamScanChannels {
 
 interface SpamScanStateEntry {
   articleId: string
+  shortHash: string
   lastScannedAt: string
   spam: boolean
 }

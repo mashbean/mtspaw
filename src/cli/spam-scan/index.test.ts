@@ -156,8 +156,8 @@ describe('spam-scan query command', () => {
     setFile(channelsPath, { feeds: [{ type: 'icymi' }] })
     setFile(statePath, {
       articles: [
-        { articleId: 'Article:spam', lastScannedAt: '2026-05-15T10:00:00.000Z', spam: true },
-        { articleId: 'Article:keep', lastScannedAt: '2026-05-15T10:00:00.000Z', spam: false },
+        { articleId: 'Article:spam', shortHash: 'sh', lastScannedAt: '2026-05-15T10:00:00.000Z', spam: true },
+        { articleId: 'Article:keep', shortHash: 'kh', lastScannedAt: '2026-05-15T10:00:00.000Z', spam: false },
       ],
     })
 
@@ -359,23 +359,34 @@ describe('spam-scan mark-scanned command', () => {
   })
 
   it('inserts a fresh entry with spam=false by default', async () => {
-    await spamScanCommand.parseAsync(['mark-scanned', '--articleId', 'Article:a1'], { from: 'user' })
+    await spamScanCommand.parseAsync(['mark-scanned', '--articleId', 'Article:a1', '--shortHash', 'sh1'], {
+      from: 'user',
+    })
 
-    const data = readFile(statePath) as { articles: { articleId: string; spam: boolean }[] }
-    expect(data.articles).toEqual([{ articleId: 'Article:a1', lastScannedAt: '2026-05-15T12:00:00.000Z', spam: false }])
+    const data = readFile(statePath) as { articles: { articleId: string; shortHash: string; spam: boolean }[] }
+    expect(data.articles).toEqual([
+      { articleId: 'Article:a1', shortHash: 'sh1', lastScannedAt: '2026-05-15T12:00:00.000Z', spam: false },
+    ])
   })
 
   it('upserts existing entries and flips spam when --spam is supplied', async () => {
     setFile(statePath, {
-      articles: [{ articleId: 'Article:a1', lastScannedAt: '2026-05-10T00:00:00.000Z', spam: false }],
+      articles: [
+        { articleId: 'Article:a1', shortHash: 'sh-old', lastScannedAt: '2026-05-10T00:00:00.000Z', spam: false },
+      ],
     })
 
-    await spamScanCommand.parseAsync(['mark-scanned', '--articleId', 'Article:a1', '--spam'], { from: 'user' })
+    await spamScanCommand.parseAsync(['mark-scanned', '--articleId', 'Article:a1', '--shortHash', 'sh-new', '--spam'], {
+      from: 'user',
+    })
 
-    const data = readFile(statePath) as { articles: { articleId: string; spam: boolean; lastScannedAt: string }[] }
+    const data = readFile(statePath) as {
+      articles: { articleId: string; shortHash: string; spam: boolean; lastScannedAt: string }[]
+    }
     expect(data.articles).toHaveLength(1)
     expect(data.articles[0]).toEqual({
       articleId: 'Article:a1',
+      shortHash: 'sh-new',
       lastScannedAt: '2026-05-15T12:00:00.000Z',
       spam: true,
     })
@@ -384,16 +395,25 @@ describe('spam-scan mark-scanned command', () => {
   it('prunes entries older than 7 days on write', async () => {
     setFile(statePath, {
       articles: [
-        { articleId: 'Article:old', lastScannedAt: '2026-05-01T00:00:00.000Z', spam: false },
-        { articleId: 'Article:keep', lastScannedAt: '2026-05-10T00:00:00.000Z', spam: false },
+        { articleId: 'Article:old', shortHash: 'sho', lastScannedAt: '2026-05-01T00:00:00.000Z', spam: false },
+        { articleId: 'Article:keep', shortHash: 'shk', lastScannedAt: '2026-05-10T00:00:00.000Z', spam: false },
       ],
     })
 
-    await spamScanCommand.parseAsync(['mark-scanned', '--articleId', 'Article:new'], { from: 'user' })
+    await spamScanCommand.parseAsync(['mark-scanned', '--articleId', 'Article:new', '--shortHash', 'shn'], {
+      from: 'user',
+    })
 
     const data = readFile(statePath) as { articles: { articleId: string }[] }
     const ids = data.articles.map((a) => a.articleId).sort()
     expect(ids).toEqual(['Article:keep', 'Article:new'])
+  })
+
+  it('aborts when --shortHash is missing', async () => {
+    await expect(
+      spamScanCommand.parseAsync(['mark-scanned', '--articleId', 'Article:a1'], { from: 'user' }),
+    ).rejects.toThrow('process.exit')
+    expect(console.error).toHaveBeenCalledWith('--shortHash is required')
   })
 })
 

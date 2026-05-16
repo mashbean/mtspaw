@@ -1,6 +1,6 @@
 # Spam Scan
 
-Version: 0.3
+Version: 0.4
 
 # Preparation
 
@@ -32,7 +32,7 @@ Version: 0.3
         If any category hits:
             - Run `mtspaw spam-scan record --userName <author.userName> --displayName <author.displayName>
               --type article --contentId <articleId> --shortHash <shortHash>`.
-            - Run `mtspaw spam-scan mark-scanned --articleId <articleId> --spam`.
+            - Run `mtspaw spam-scan mark-scanned --articleId <articleId> --shortHash <shortHash> --spam`.
             - Skip 4-2 and 4-3 for this article; jump to 4-4.
     4-2. For each comment in `comments`:
         - If `communityWatchAction` is non-null, run `mtspaw spam-scan note-cw --userName <author.userName>
@@ -41,7 +41,8 @@ Version: 0.3
         - Judge `content` against the same five categories. On any hit, run
           `mtspaw spam-scan record --userName <author.userName> --displayName <author.displayName>
           --type comment --contentId <commentId> --shortHash <article.shortHash>`.
-    4-3. After all comments are judged, run `mtspaw spam-scan mark-scanned --articleId <articleId>`
+    4-3. After all comments are judged, run
+        `mtspaw spam-scan mark-scanned --articleId <articleId> --shortHash <shortHash>`
         (without --spam) to update lastScannedAt for the next visit.
     4-4. Pause 1 second before the next article.
 

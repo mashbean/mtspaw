@@ -455,18 +455,20 @@ const recordCommand = new Command('record')
 const markScannedCommand = new Command('mark-scanned')
   .description('Upsert article into spam-scan-state.json and prune stale entries')
   .option('--articleId <id>', 'Article id')
+  .option('--shortHash <hash>', 'Article short hash')
   .option('--spam', 'Mark as spam (will be permanently skipped within TTL)')
-  .action(async (opts: { articleId?: string; spam?: boolean }) => {
+  .action(async (opts: { articleId?: string; shortHash?: string; spam?: boolean }) => {
     const articleId = requireFlag(opts.articleId, '--articleId')
+    const shortHash = requireFlag(opts.shortHash, '--shortHash')
     const spam = !!opts.spam
     const now = new Date().toISOString()
 
     const state = prunedState(readState())
     const idx = state.articles.findIndex((a) => a.articleId === articleId)
     if (idx >= 0) {
-      state.articles[idx] = { articleId, lastScannedAt: now, spam }
+      state.articles[idx] = { articleId, shortHash, lastScannedAt: now, spam }
     } else {
-      state.articles.push({ articleId, lastScannedAt: now, spam })
+      state.articles.push({ articleId, shortHash, lastScannedAt: now, spam })
     }
 
     writeState(state)

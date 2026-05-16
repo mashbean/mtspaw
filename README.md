@@ -294,7 +294,7 @@ in `spammers.json`, and produces plain-text output for an external telegram pipe
 ```
 mtspaw spam-scan query
 mtspaw spam-scan record --userName <name> --displayName <name> --type article|comment --contentId <id> --shortHash <hash>
-mtspaw spam-scan mark-scanned --articleId <id> [--spam]
+mtspaw spam-scan mark-scanned --articleId <id> --shortHash <hash> [--spam]
 mtspaw spam-scan note-cw --userName <name> --uuid <uuid> --createdAt <iso>
 mtspaw spam-scan list-unreported
 mtspaw spam-scan mark-reported --userName <name>
