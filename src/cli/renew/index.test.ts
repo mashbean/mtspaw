@@ -42,4 +42,46 @@ describe('renew doc command', () => {
     )
     expect(fs.copyFileSync).not.toHaveBeenCalled()
   })
+
+  it('renew doc all copies every entry to its workspace dest', async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true)
+
+    await renewCommand.parseAsync(['doc', 'all'], { from: 'user' })
+
+    const dests = vi.mocked(fs.copyFileSync).mock.calls.map((c) => c[1])
+    expect(dests).toEqual(
+      expect.arrayContaining([
+        '/test/workspace/AGENTS.md',
+        '/test/workspace/playbooks/comment-reply.md',
+        '/test/workspace/playbooks/donate-article.md',
+        '/test/workspace/playbooks/post-article.md',
+        '/test/workspace/playbooks/post-trending-article.md',
+        '/test/workspace/playbooks/spam-scan.md',
+        '/test/workspace/playbooks/track-and-post-comment.md',
+      ]),
+    )
+    expect(dests).toHaveLength(7)
+  })
+
+  it('renew doc all aborts before any copy when any source is missing', async () => {
+    vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit')
+    })
+    vi.mocked(fs.existsSync).mockImplementation((p) => !String(p).endsWith('spam-scan.md'))
+
+    await expect(renewCommand.parseAsync(['doc', 'all'], { from: 'user' })).rejects.toThrow('process.exit')
+    expect(fs.copyFileSync).not.toHaveBeenCalled()
+  })
+
+  it('renew doc all --target ... is rejected', async () => {
+    vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit')
+    })
+
+    await expect(renewCommand.parseAsync(['doc', 'all', '--target', 'AGENTS.md'], { from: 'user' })).rejects.toThrow(
+      'process.exit',
+    )
+    expect(console.error).toHaveBeenCalledWith('--target cannot be combined with "all"')
+    expect(fs.copyFileSync).not.toHaveBeenCalled()
+  })
 })

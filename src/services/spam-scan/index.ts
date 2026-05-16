@@ -159,8 +159,29 @@ const stripHtml = (html: string): string => {
     .trim()
 }
 
+const formatUnreportedReport = (users: Record<string, SpammerUser>): { text: string; userNames: string[] } => {
+  const entries = Object.entries(users).filter(([, u]) => !u.reported)
+  if (entries.length === 0) {
+    return { text: '', userNames: [] }
+  }
+  const lines: string[] = []
+  for (const [userName, user] of entries) {
+    lines.push(`@${userName} (${user.displayName})`)
+    lines.push(`  first: ${user.firstSeenAt}  last: ${user.lastSeenAt}  occurrences: ${user.occurrences.length}`)
+    if (user.communityWatchHistory.seen) {
+      lines.push(`  community watch: handled at ${user.communityWatchHistory.lastSeenAt}`)
+    }
+    for (const o of user.occurrences) {
+      lines.push(`    ${o.foundAt}  ${o.type}  ${o.contentId}  shortHash=${o.shortHash}`)
+    }
+    lines.push('')
+  }
+  return { text: lines.join('\n').replace(/\n+$/, ''), userNames: entries.map(([n]) => n) }
+}
+
 export {
   channelsPath,
+  formatUnreportedReport,
   OCCURRENCES_CAP,
   pendingPath,
   prunedState,

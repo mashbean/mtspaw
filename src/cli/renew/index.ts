@@ -38,11 +38,37 @@ const buildTargets = (): Record<string, { src: string; dest: string }> => ({
 const renewCommand = new Command('renew').description('Renew workspace files from source')
 
 renewCommand
-  .command('doc')
-  .description('Refresh a doc in the current workspace')
+  .command('doc [mode]')
+  .description('Refresh workspace doc(s). Pass "all" to refresh every doc.')
   .option('--target <name>', 'Doc to renew (AGENTS.md, post-article.md, track-and-post-comment.md)')
-  .action(async (options: { target?: string }) => {
+  .action(async (mode: string | undefined, options: { target?: string }) => {
     const targets = buildTargets()
+
+    if (mode === 'all') {
+      if (options.target) {
+        console.error('--target cannot be combined with "all"')
+        process.exit(1)
+      }
+      const entries = Object.entries(targets)
+      for (const [name, entry] of entries) {
+        if (!fs.existsSync(entry.src)) {
+          console.error(`Source not found: ${entry.src} (${name})`)
+          process.exit(1)
+        }
+      }
+      for (const [, entry] of entries) {
+        fs.mkdirSync(path.dirname(entry.dest), { recursive: true })
+        fs.copyFileSync(entry.src, entry.dest)
+        console.log(`Renewed: ${entry.dest}`)
+      }
+      return
+    }
+
+    if (mode) {
+      console.error(`Unknown mode: ${mode}. Use "all" or omit and pass --target.`)
+      process.exit(1)
+    }
+
     let chosen = options.target
 
     if (!chosen) {

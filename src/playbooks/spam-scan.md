@@ -1,6 +1,6 @@
 # Spam Scan
 
-Version: 0.1
+Version: 0.2
 
 # Preparation
 
@@ -47,3 +47,6 @@ Version: 0.1
     4-4. Randomly pause n seconds (30 <= n < 180) before the next article.
 
 5. Clear spam-pending.json by writing `{ "articles": [] }`.
+
+6. Run `mtspaw spam-scan report` to forward unreported spammers to Slack
+    and mark them reported on successful delivery. Skip silently when none.

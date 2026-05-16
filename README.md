@@ -299,6 +299,7 @@ mtspaw spam-scan note-cw --userName <name> --uuid <uuid> --createdAt <iso>
 mtspaw spam-scan list-unreported
 mtspaw spam-scan mark-reported --userName <name>
 mtspaw spam-scan mark-reported --all
+mtspaw spam-scan report
 ```
 
 `query` reads `spam-scan-channels.json`, walks each feed for 10 articles plus up to 5 top-level and 5
@@ -315,7 +316,11 @@ not already in the roster.
 `list-unreported` prints every roster user with `reported: false` as plain text (userName, displayName,
 occurrences, and a community-watch annotation when applicable).
 `mark-reported` flips `reported: true` on a single user or on every unreported entry. The external
-pipeline forwards `list-unreported` output to telegram and runs `mark-reported --all` on success.
+pipeline forwards `list-unreported` output and runs `mark-reported --all` on success.
+
+`report` is the integrated Slack flow: it builds the same plain-text body as `list-unreported`, POSTs
+to `https://slack.com/api/chat.postMessage` with the bearer token, and flips `reported: true` on every
+included user only when Slack returns `ok: true`. Exits 0 silently when there are no unreported entries.
 
 ### Global options
 
@@ -339,7 +344,8 @@ The src/playbooks directory contains step-by-step instructions for agents to exe
   from the pending file. Designed to run on a periodic cron.
 - spam-scan.md: walks configured feeds via `mtspaw spam-scan query`, LLM-judges each new article and
   comment against five spam categories, records hits to `spammers.json`, and marks articles scanned.
-  Designed to run on a periodic cron; `list-unreported` is the operator-facing report.
+  Designed to run on a periodic cron; the final step calls `mtspaw spam-scan report` to push fresh
+  unreported spammers to Slack and flip `reported: true` on successful delivery.
 
 Agents run these playbooks from their workspace directory where env.json, track.json, and SOUL.md are available.
 

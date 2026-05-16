@@ -33,7 +33,7 @@ vi.mock('node:fs', () => {
 
 import { input } from '@inquirer/prompts'
 
-import { fetchGqlWithAuthRetry } from '../../services/auth/index.js'
+import { fetchGqlWithAuthRetry, readEnvJson } from '../../services/auth/index.js'
 import { spamScanCommand } from './index.js'
 
 interface FsMockShape {
@@ -504,11 +504,12 @@ describe('spam-scan list-unreported command', () => {
 
     await spamScanCommand.parseAsync(['list-unreported'], { from: 'user' })
 
-    const logged = vi.mocked(console.log).mock.calls.map((c) => c[0])
-    expect(logged).toContain('@alice (Alice)')
-    expect(logged).toContain('  community watch: handled at 2026-05-15T10:00:00.000Z')
-    expect(logged.some((l) => typeof l === 'string' && l.includes('Comment:c1'))).toBe(true)
-    expect(logged.some((l) => typeof l === 'string' && l.includes('@skipme'))).toBe(false)
+    expect(vi.mocked(console.log).mock.calls).toHaveLength(1)
+    const out = vi.mocked(console.log).mock.calls[0][0] as string
+    expect(out).toContain('@alice (Alice)')
+    expect(out).toContain('  community watch: handled at 2026-05-15T10:00:00.000Z')
+    expect(out).toContain('Comment:c1')
+    expect(out).not.toContain('@skipme')
   })
 })
 
@@ -615,5 +616,127 @@ describe('spam-scan mark-reported command', () => {
       spamScanCommand.parseAsync(['mark-reported', '--userName', 'ghost'], { from: 'user' }),
     ).rejects.toThrow('process.exit')
     expect(console.error).toHaveBeenCalledWith('user not found: ghost')
+  })
+})
+
+describe('spam-scan report command', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    fsStore.clear()
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit')
+    })
+    vi.unstubAllGlobals()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  const seedUnreported = () => {
+    setFile(spammersPath, {
+      users: {
+        alice: {
+          displayName: 'Alice',
+          firstSeenAt: '2026-05-10T00:00:00.000Z',
+          lastSeenAt: '2026-05-15T00:00:00.000Z',
+          occurrences: [
+            { type: 'comment', contentId: 'Comment:c1', shortHash: 'sh1', foundAt: '2026-05-15T00:00:00.000Z' },
+          ],
+          reported: false,
+          communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+        },
+        bob: {
+          displayName: 'Bob',
+          firstSeenAt: '2026-05-12T00:00:00.000Z',
+          lastSeenAt: '2026-05-15T00:00:00.000Z',
+          occurrences: [],
+          reported: true,
+          communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+        },
+      },
+    })
+  }
+
+  it('aborts when slack.token is missing', async () => {
+    vi.mocked(readEnvJson).mockReturnValueOnce({ mattersApi: 'https://api.test', slack: { channel: '#x' } })
+    seedUnreported()
+
+    await expect(spamScanCommand.parseAsync(['report'], { from: 'user' })).rejects.toThrow('process.exit')
+    expect(console.error).toHaveBeenCalledWith('slack.token is required in env.json')
+  })
+
+  it('aborts when slack.channel is missing', async () => {
+    vi.mocked(readEnvJson).mockReturnValueOnce({ mattersApi: 'https://api.test', slack: { token: 'xoxb-1' } })
+    seedUnreported()
+
+    await expect(spamScanCommand.parseAsync(['report'], { from: 'user' })).rejects.toThrow('process.exit')
+    expect(console.error).toHaveBeenCalledWith('slack.channel is required in env.json')
+  })
+
+  it('skips fetch and write when there are no unreported entries', async () => {
+    vi.mocked(readEnvJson).mockReturnValueOnce({
+      mattersApi: 'https://api.test',
+      slack: { token: 'xoxb-1', channel: '#x' },
+    })
+    setFile(spammersPath, { users: {} })
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await spamScanCommand.parseAsync(['report'], { from: 'user' })
+
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(console.log).toHaveBeenCalledWith('no unreported spammers, skipped')
+  })
+
+  it('posts to chat.postMessage and flips reported on every included user', async () => {
+    vi.mocked(readEnvJson).mockReturnValueOnce({
+      mattersApi: 'https://api.test',
+      slack: { token: 'xoxb-1', channel: 'C123' },
+    })
+    seedUnreported()
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await spamScanCommand.parseAsync(['report'], { from: 'user' })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('https://slack.com/api/chat.postMessage')
+    const headers = init.headers as Record<string, string>
+    expect(headers.Authorization).toBe('Bearer xoxb-1')
+    const body = JSON.parse(init.body as string) as { channel: string; text: string }
+    expect(body.channel).toBe('C123')
+    expect(body.text).toContain('@alice (Alice)')
+    expect(body.text).not.toContain('@bob')
+
+    const data = readFile(spammersPath) as { users: Record<string, { reported: boolean }> }
+    expect(data.users.alice.reported).toBe(true)
+    expect(data.users.bob.reported).toBe(true)
+  })
+
+  it('exits 1 and leaves spammers.json untouched when Slack responds ok:false', async () => {
+    vi.mocked(readEnvJson).mockReturnValueOnce({
+      mattersApi: 'https://api.test',
+      slack: { token: 'xoxb-1', channel: 'C123' },
+    })
+    seedUnreported()
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: false, error: 'channel_not_found' }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(spamScanCommand.parseAsync(['report'], { from: 'user' })).rejects.toThrow('process.exit')
+    expect(console.error).toHaveBeenCalledWith('slack send failed: channel_not_found')
+
+    const data = readFile(spammersPath) as { users: Record<string, { reported: boolean }> }
+    expect(data.users.alice.reported).toBe(false)
   })
 })

@@ -14,6 +14,7 @@ import type {
   SpamScanState,
 } from '../../services/spam-scan/index.js'
 import {
+  formatUnreportedReport,
   OCCURRENCES_CAP,
   prunedState,
   readChannels,
@@ -493,28 +494,88 @@ const noteCwCommand = new Command('note-cw')
     console.log(`note-cw: updated CW history for @${userName}`)
   })
 
-const formatOccurrences = (occ: SpammerOccurrence[]): string => {
-  return occ.map((o) => `    ${o.foundAt}  ${o.type}  ${o.contentId}  shortHash=${o.shortHash}`).join('\n')
-}
-
 const listUnreportedCommand = new Command('list-unreported')
   .description('Print all unreported spammers as plain text for downstream notifications')
   .action(() => {
     const spammers = readSpammers()
-    const entries = Object.entries(spammers.users).filter(([, u]) => !u.reported)
-    if (entries.length === 0) {
+    const { text, userNames } = formatUnreportedReport(spammers.users)
+    if (userNames.length === 0) {
       console.log('No unreported spammers.')
       return
     }
-    for (const [userName, user] of entries) {
-      console.log(`@${userName} (${user.displayName})`)
-      console.log(`  first: ${user.firstSeenAt}  last: ${user.lastSeenAt}  occurrences: ${user.occurrences.length}`)
-      if (user.communityWatchHistory.seen) {
-        console.log(`  community watch: handled at ${user.communityWatchHistory.lastSeenAt}`)
-      }
-      console.log(formatOccurrences(user.occurrences))
-      console.log('')
+    console.log(text)
+  })
+
+const SLACK_API = 'https://slack.com/api/chat.postMessage'
+
+interface SlackConfig {
+  token: string
+  channel: string
+}
+
+const requireSlackConfig = (envJson: Record<string, unknown>): SlackConfig => {
+  const slack = envJson.slack as { token?: unknown; channel?: unknown } | undefined
+  const token = typeof slack?.token === 'string' ? slack.token.trim() : ''
+  const channel = typeof slack?.channel === 'string' ? slack.channel.trim() : ''
+  if (!token) {
+    console.error('slack.token is required in env.json')
+    process.exit(1)
+  }
+  if (!channel) {
+    console.error('slack.channel is required in env.json')
+    process.exit(1)
+  }
+  return { token, channel }
+}
+
+const postSlackMessage = async (config: SlackConfig, text: string): Promise<{ ok: boolean; error: string | null }> => {
+  const res = await fetch(SLACK_API, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      Authorization: `Bearer ${config.token}`,
+    },
+    body: JSON.stringify({ channel: config.channel, text }),
+  })
+  if (!res.ok) {
+    return { ok: false, error: `HTTP ${res.status} ${res.statusText}` }
+  }
+  const body = (await res.json()) as { ok?: boolean; error?: string }
+  if (!body.ok) {
+    return { ok: false, error: body.error ?? 'unknown slack error' }
+  }
+  return { ok: true, error: null }
+}
+
+const reportCommand = new Command('report')
+  .description('Send unreported spammers to Slack and mark them reported on success')
+  .action(async () => {
+    const envJsonPath = requireEnvJson()
+    const envJson = readEnvJson(envJsonPath)
+    const slack = requireSlackConfig(envJson)
+
+    const spammers = readSpammers()
+    const { text, userNames } = formatUnreportedReport(spammers.users)
+    if (userNames.length === 0) {
+      console.log('no unreported spammers, skipped')
+      return
     }
+
+    const result = await postSlackMessage(slack, text)
+    if (!result.ok) {
+      console.error(`slack send failed: ${result.error}`)
+      process.exit(1)
+    }
+
+    const fresh = readSpammers()
+    for (const name of userNames) {
+      const u = fresh.users[name]
+      if (u) {
+        u.reported = true
+      }
+    }
+    writeSpammers(fresh)
+    console.log(`report: sent ${userNames.length} entries, flipped reported`)
   })
 
 const markReportedCommand = new Command('mark-reported')
@@ -562,5 +623,6 @@ spamScanCommand.addCommand(markScannedCommand)
 spamScanCommand.addCommand(noteCwCommand)
 spamScanCommand.addCommand(listUnreportedCommand)
 spamScanCommand.addCommand(markReportedCommand)
+spamScanCommand.addCommand(reportCommand)
 
 export { spamScanCommand }
