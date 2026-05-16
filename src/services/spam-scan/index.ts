@@ -160,6 +160,19 @@ const stripHtml = (html: string): string => {
     .trim()
 }
 
+const formatTime = (iso: string | null | undefined): string => {
+  if (!iso) {
+    return ''
+  }
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) {
+    return iso
+  }
+  const shifted = new Date(d.getTime() + 8 * 60 * 60 * 1000)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())} ${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())}`
+}
+
 const formatUnreportedReport = (users: Record<string, SpammerUser>): { text: string; userNames: string[] } => {
   const entries = Object.entries(users).filter(([, u]) => !u.reported)
   if (entries.length === 0) {
@@ -167,13 +180,15 @@ const formatUnreportedReport = (users: Record<string, SpammerUser>): { text: str
   }
   const lines: string[] = []
   for (const [userName, user] of entries) {
-    lines.push(`@${userName} (${user.displayName})`)
-    lines.push(`  first: ${user.firstSeenAt}  last: ${user.lastSeenAt}  occurrences: ${user.occurrences.length}`)
+    lines.push(`*@${userName} (${user.displayName})*`)
+    lines.push(
+      `first: ${formatTime(user.firstSeenAt)}  last: ${formatTime(user.lastSeenAt)}  Spam 次數: ${user.occurrences.length}`,
+    )
     if (user.communityWatchHistory.seen) {
-      lines.push(`  community watch: handled at ${user.communityWatchHistory.lastSeenAt}`)
+      lines.push(`community watch: handled at ${formatTime(user.communityWatchHistory.lastSeenAt)}`)
     }
     for (const o of user.occurrences) {
-      lines.push(`    ${o.foundAt}  ${o.type}  ${o.contentId}  shortHash=${o.shortHash}`)
+      lines.push(`${formatTime(o.foundAt)}  ${o.type}  ${o.shortHash}`)
     }
     lines.push('')
   }

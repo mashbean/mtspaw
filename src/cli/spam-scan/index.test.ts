@@ -589,9 +589,11 @@ describe('spam-scan list-unreported command', () => {
 
     expect(vi.mocked(console.log).mock.calls).toHaveLength(1)
     const out = vi.mocked(console.log).mock.calls[0][0] as string
-    expect(out).toContain('@alice (Alice)')
-    expect(out).toContain('  community watch: handled at 2026-05-15T10:00:00.000Z')
-    expect(out).toContain('Comment:c1')
+    expect(out).toContain('*@alice (Alice)*')
+    expect(out).toContain('community watch: handled at 2026-05-15 18:00')
+    expect(out).toContain('Spam 次數: 1')
+    expect(out).toContain('2026-05-15 08:00  comment  sh1')
+    expect(out).not.toContain('Comment:c1')
     expect(out).not.toContain('@skipme')
   })
 })
@@ -796,7 +798,7 @@ describe('spam-scan report command', () => {
     expect(headers.Authorization).toBe('Bearer xoxb-1')
     const body = JSON.parse(init.body as string) as { channel: string; text: string }
     expect(body.channel).toBe('C123')
-    expect(body.text).toContain('@alice (Alice)')
+    expect(body.text).toContain('*@alice (Alice)*')
     expect(body.text).not.toContain('@bob')
 
     const data = readFile(spammersPath) as { users: Record<string, { reported: boolean }> }
