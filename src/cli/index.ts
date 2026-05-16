@@ -28,6 +28,7 @@ import { removeCommand } from './remove/index.js'
 import { renewCommand } from './renew/index.js'
 import { replyQueryCommand } from './reply-query/index.js'
 import { scoreCommand } from './score/index.js'
+import { spamScanCommand } from './spam-scan/index.js'
 import { syncSchemaCommand } from './sync-schema/index.js'
 import { thresholdCommand } from './threshold/index.js'
 import { trackCommand } from './track/index.js'
@@ -113,6 +114,7 @@ program.addCommand(removeCommand)
 program.addCommand(renewCommand)
 program.addCommand(replyQueryCommand)
 program.addCommand(scoreCommand)
+program.addCommand(spamScanCommand)
 program.addCommand(syncSchemaCommand)
 program.addCommand(thresholdCommand)
 program.addCommand(trackCommand)

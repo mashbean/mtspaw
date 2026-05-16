@@ -34,6 +34,7 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
       { name: 'comment_reply', value: 'comment_reply' },
       { name: 'wallet', value: 'wallet' },
       { name: 'donate', value: 'donate' },
+      { name: 'spam_scan', value: 'spam_scan' },
     ],
   })
 
@@ -65,6 +66,7 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
       comment_reply: enabledFeatures.includes('comment_reply'),
       wallet: enabledFeatures.includes('wallet'),
       donate: enabledFeatures.includes('donate'),
+      spam_scan: enabledFeatures.includes('spam_scan'),
     },
     thresholds: {
       comment: 80,
@@ -72,6 +74,25 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
     },
   }
   fs.writeFileSync(path.join(workspaceDir, 'env.json'), JSON.stringify(envJson, null, 2))
+
+  const spamScanChannelsPath = path.join(workspaceDir, 'spam-scan-channels.json')
+  if (!fs.existsSync(spamScanChannelsPath)) {
+    const channels = {
+      feeds: [
+        { type: 'icymi' },
+        { type: 'hottest' },
+        { type: 'channel', shortHash: 'nycmlq5d4w8a' },
+        { type: 'channel', shortHash: 'iac3sxh237g7' },
+        { type: 'channel', shortHash: 'q6yptbvr0ph7' },
+        { type: 'channel', shortHash: 'bzs4ay4fzmkg' },
+        { type: 'channel', shortHash: '1ptnue2cleq4' },
+        { type: 'channel', shortHash: 'koumlwiel7va' },
+        { type: 'channel', shortHash: '9cl0utzfi7s0' },
+      ],
+    }
+    fs.writeFileSync(spamScanChannelsPath, JSON.stringify(channels, null, 2))
+    console.log(`Seeded spam-scan channels: ${spamScanChannelsPath}`)
+  }
 
   const playbooksSrc = path.resolve(import.meta.dirname, '../../../src/playbooks')
   const playbooksDest = path.join(workspaceDir, 'playbooks')

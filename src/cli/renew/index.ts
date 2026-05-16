@@ -25,6 +25,10 @@ const buildTargets = (): Record<string, { src: string; dest: string }> => ({
     src: path.resolve(import.meta.dirname, '../../../src/playbooks/post-trending-article.md'),
     dest: path.join(process.cwd(), 'playbooks/post-trending-article.md'),
   },
+  'spam-scan.md': {
+    src: path.resolve(import.meta.dirname, '../../../src/playbooks/spam-scan.md'),
+    dest: path.join(process.cwd(), 'playbooks/spam-scan.md'),
+  },
   'track-and-post-comment.md': {
     src: path.resolve(import.meta.dirname, '../../../src/playbooks/track-and-post-comment.md'),
     dest: path.join(process.cwd(), 'playbooks/track-and-post-comment.md'),

@@ -221,8 +221,8 @@ mtspaw feature remove --feature comment
 All feature commands also support interactive mode when called without --feature.
 
 `init-agent` seeds these known feature keys: `article`, `comment`,
-`comment_like`, `comment_reply`, `wallet`, `donate`. Playbooks read these
-flags to decide whether the agent is permitted to perform the corresponding action.
+`comment_like`, `comment_reply`, `wallet`, `donate`, `spam_scan`. Playbooks read
+these flags to decide whether the agent is permitted to perform the corresponding action.
 
 ### Threshold management
 
@@ -286,6 +286,37 @@ mtspaw donate article --shortHash <hash> [--amount <usdt>]
 
 `--amount` defaults to `0.1` USDT when omitted.
 
+### Spam patrol
+
+Periodically scans configured feeds for spam articles and comments, accumulates a roster of offenders
+in `spammers.json`, and produces plain-text output for an external telegram pipeline.
+
+```
+mtspaw spam-scan query
+mtspaw spam-scan record --userName <name> --displayName <name> --type article|comment --contentId <id> --shortHash <hash>
+mtspaw spam-scan mark-scanned --articleId <id> [--spam]
+mtspaw spam-scan note-cw --userName <name> --uuid <uuid> --createdAt <iso>
+mtspaw spam-scan list-unreported
+mtspaw spam-scan mark-reported --userName <name>
+mtspaw spam-scan mark-reported --all
+```
+
+`query` reads `spam-scan-channels.json`, walks each feed for 10 articles plus up to 5 top-level and 5
+nested comments each, and writes `spam-pending.json` for the playbook to judge. Article entries already
+flagged spam within the 7-day TTL are skipped; non-spam articles are re-visited with only newer comments.
+
+`spam-scan-channels.json` is seeded by `init-agent` with icymi, hottest, and seven curated channel
+shortHashes. The operator edits this file to tune coverage.
+
+`record` appends an occurrence under a user in `spammers.json`, rotating at 10 entries.
+`mark-scanned` upserts the article state and prunes entries older than 7 days.
+`note-cw` updates `communityWatchHistory` on an existing roster entry; it is a no-op when the user is
+not already in the roster.
+`list-unreported` prints every roster user with `reported: false` as plain text (userName, displayName,
+occurrences, and a community-watch annotation when applicable).
+`mark-reported` flips `reported: true` on a single user or on every unreported entry. The external
+pipeline forwards `list-unreported` output to telegram and runs `mark-reported --all` on success.
+
 ### Global options
 
 ```
@@ -306,6 +337,9 @@ The src/playbooks directory contains step-by-step instructions for agents to exe
 - comment-reply.md: pulls fresh CommentNewReply notices via `mtspaw reply-query` into reply-pending.json,
   decides per entry whether to reply back (questions or quality > 60) or like, then removes the entry
   from the pending file. Designed to run on a periodic cron.
+- spam-scan.md: walks configured feeds via `mtspaw spam-scan query`, LLM-judges each new article and
+  comment against five spam categories, records hits to `spammers.json`, and marks articles scanned.
+  Designed to run on a periodic cron; `list-unreported` is the operator-facing report.
 
 Agents run these playbooks from their workspace directory where env.json, track.json, and SOUL.md are available.
 
