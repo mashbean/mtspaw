@@ -289,11 +289,16 @@ const flattenComments = (raw: RawComment[], cutoffMs: number): PendingComment[] 
     author: AuthorRef,
     depth: 'top' | 'reply',
     cw: PendingCommentCW | null,
+    parentCommentId?: string,
   ) => {
     if (!cw && isCommentBenign(content)) {
       return
     }
-    out.push({ commentId: id, content, author, depth, communityWatchAction: cw })
+    const entry: PendingComment = { commentId: id, content, author, depth, communityWatchAction: cw }
+    if (parentCommentId) {
+      entry.parentCommentId = parentCommentId
+    }
+    out.push(entry)
   }
   for (const top of raw) {
     if (top.state !== 'active') {
@@ -319,7 +324,14 @@ const flattenComments = (raw: RawComment[], cutoffMs: number): PendingComment[] 
       }
       const nestedCreatedMs = Date.parse(nested.createdAt)
       if (Number.isFinite(nestedCreatedMs) && nestedCreatedMs > cutoffMs) {
-        addIf(nested.id, stripHtml(nested.content ?? ''), nestedAuthor, 'reply', nested.communityWatchAction ?? null)
+        addIf(
+          nested.id,
+          stripHtml(nested.content ?? ''),
+          nestedAuthor,
+          'reply',
+          nested.communityWatchAction ?? null,
+          top.id,
+        )
       }
     }
   }
@@ -439,6 +451,7 @@ const recordCommand = new Command('record')
   .option('--type <type>', 'Occurrence type: article or comment')
   .option('--contentId <id>', 'Article id or comment id')
   .option('--shortHash <hash>', 'Article short hash (for article or comment occurrence)')
+  .option('--parentCommentId <id>', 'Parent comment id (for nested reply comments only)')
   .action(
     async (opts: {
       userName?: string
@@ -446,6 +459,7 @@ const recordCommand = new Command('record')
       type?: string
       contentId?: string
       shortHash?: string
+      parentCommentId?: string
     }) => {
       const userName = requireFlag(opts.userName, '--userName')
       const displayName = opts.displayName ?? ''
@@ -463,6 +477,9 @@ const recordCommand = new Command('record')
         contentId,
         shortHash,
         foundAt: now,
+      }
+      if (type === 'comment' && opts.parentCommentId?.trim()) {
+        occurrence.parentCommentId = opts.parentCommentId.trim()
       }
 
       const spammers: Spammers = readSpammers()

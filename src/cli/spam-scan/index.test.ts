@@ -470,6 +470,52 @@ describe('spam-scan record command', () => {
     const data = readFile(spammersPath) as { users: Record<string, unknown> }
     expect(Object.keys(data.users)).toEqual(['first'])
   })
+
+  it('persists --parentCommentId on a reply comment occurrence', async () => {
+    await spamScanCommand.parseAsync(
+      [
+        'record',
+        '--userName',
+        'alice',
+        '--type',
+        'comment',
+        '--contentId',
+        'Comment:r1',
+        '--shortHash',
+        'sh1',
+        '--parentCommentId',
+        'Comment:p1',
+      ],
+      { from: 'user' },
+    )
+    const data = readFile(spammersPath) as {
+      users: Record<string, { occurrences: { parentCommentId?: string }[] }>
+    }
+    expect(data.users.alice.occurrences[0].parentCommentId).toBe('Comment:p1')
+  })
+
+  it('ignores --parentCommentId when --type is article', async () => {
+    await spamScanCommand.parseAsync(
+      [
+        'record',
+        '--userName',
+        'alice',
+        '--type',
+        'article',
+        '--contentId',
+        'Article:a1',
+        '--shortHash',
+        'sh1',
+        '--parentCommentId',
+        'Comment:p1',
+      ],
+      { from: 'user' },
+    )
+    const data = readFile(spammersPath) as {
+      users: Record<string, { occurrences: { parentCommentId?: string }[] }>
+    }
+    expect(data.users.alice.occurrences[0].parentCommentId).toBeUndefined()
+  })
 })
 
 describe('spam-scan mark-scanned command', () => {
@@ -660,10 +706,38 @@ describe('spam-scan list-unreported command', () => {
     const out = vi.mocked(console.log).mock.calls[0][0] as string
     expect(out).toContain('<https://matters.town/@alice|@alice> (Alice)')
     expect(out).toContain('Spam 次數: 1  守望相助檢舉過')
-    expect(out).toContain('05-15 08:00  評論  <https://matters.town/a/sh1#comment-Comment:c1|Comment:c1>')
+    expect(out).toContain('05-15 08:00  評論  <https://matters.town/a/sh1#Comment:c1|Comment:c1>')
     expect(out).not.toContain('@skipme')
     expect(out).not.toContain('first:')
     expect(out).not.toContain('last:')
+  })
+
+  it('renders reply occurrences with parentCommentId in the URL fragment', async () => {
+    setFile(spammersPath, {
+      users: {
+        bob: {
+          displayName: 'Bob',
+          firstSeenAt: '2026-05-15T00:00:00.000Z',
+          lastSeenAt: '2026-05-15T00:00:00.000Z',
+          occurrences: [
+            {
+              type: 'comment',
+              contentId: 'Comment:r1',
+              shortHash: 'sh1',
+              foundAt: '2026-05-15T00:00:00.000Z',
+              parentCommentId: 'Comment:p1',
+            },
+          ],
+          reported: false,
+          communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+        },
+      },
+    })
+
+    await spamScanCommand.parseAsync(['list-unreported'], { from: 'user' })
+
+    const out = vi.mocked(console.log).mock.calls[0][0] as string
+    expect(out).toContain('https://matters.town/a/sh1#Comment:p1-Comment:r1|Comment:r1')
   })
 
   it('shows "10+" for Spam 次數 when occurrences hit the rotation cap', async () => {

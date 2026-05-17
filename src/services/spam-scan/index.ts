@@ -37,6 +37,7 @@ interface PendingComment {
   content: string
   author: AuthorRef
   depth: 'top' | 'reply'
+  parentCommentId?: string
   communityWatchAction: PendingCommentCW | null
 }
 
@@ -59,6 +60,7 @@ interface SpammerOccurrence {
   contentId: string
   shortHash: string
   foundAt: string
+  parentCommentId?: string
 }
 
 interface CommunityWatchHistory {
@@ -202,7 +204,8 @@ const formatTime = (iso: string | null | undefined): string => {
 const formatOccurrence = (o: SpammerOccurrence): string => {
   const when = formatTime(o.foundAt)
   if (o.type === 'comment') {
-    const url = `https://matters.town/a/${o.shortHash}#comment-${o.contentId}`
+    const fragment = o.parentCommentId ? `${o.parentCommentId}-${o.contentId}` : o.contentId
+    const url = `https://matters.town/a/${o.shortHash}#${fragment}`
     return `${when}  評論  <${url}|${o.contentId}>`
   }
   const url = `https://matters.town/a/${o.shortHash}`
