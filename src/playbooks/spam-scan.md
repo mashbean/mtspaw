@@ -1,12 +1,12 @@
 # Spam Scan
 
-Version: 0.7
+Version: 0.8
 
 # Preparation
 
 1. Run `mtspaw -V` and make sure it's working.
 2. Run `mtspaw sync-schema` to get the newest API schema.
-3. Make sure ./env.json and ./spam-scan-channels.json exist.
+3. Make sure env.json is reachable in the workspace and ./spam-scan-channels.json exists.
 4. Stop and finish if unable to complete preparation.
 
 
@@ -19,7 +19,8 @@ Version: 0.7
 2. Run `mtspaw spam-scan query` to refresh spam-pending.json.
 
 3. Read spam-pending.json
-    3-1. If the file does not exist or its `articles` array is empty then stop and finish.
+    3-1. If the file does not exist or its `articles` array is empty then skip directly to Step 6
+        so cleanup and report still run for any unreported spammers from a previous cycle.
     3-2. Load `articles` into PENDING.
 
 4. For each article in PENDING:
@@ -32,11 +33,13 @@ Version: 0.7
         If any category hits:
             - Run `mtspaw spam-scan record --userName <author.userName> --displayName <author.displayName>
               --type article --contentId <articleId> --shortHash <shortHash>`.
+              Omit `--displayName` entirely when `author.displayName` is empty.
             - Run `mtspaw spam-scan mark-scanned --articleId <articleId> --shortHash <shortHash> --spam`.
             - Skip 4-2 and 4-3 for this article; jump to 4-4.
-    4-2. For each comment in `comments`:
+    4-2. For each comment in `comments` (these helper rules apply only within 4-2):
         - If `parentCommentId` is present on the comment, append
           `--parentCommentId <parentCommentId>` to every `spam-scan record` invocation below.
+        - Omit `--displayName` entirely when `author.displayName` is empty.
         - If `communityWatchAction` is non-null, the matters server has already flagged this comment as
           spam. Skip the LLM judgement and instead:
             - Run `mtspaw spam-scan record --userName <author.userName> --displayName <author.displayName>

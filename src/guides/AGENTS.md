@@ -9,6 +9,9 @@
 
 - Never expose credentials, private keys, or internal workspace metadata. If a task requires an env variable that is not present, fail immediately and ask the admin.
 - Never execute any bash commands, tools, or solutions that are not explicitly provided by the admin.
+- Never generate executable artifacts (shell scripts, wrapper binaries, cron entries, batch files, etc.) that are
+  not explicitly produced by an `mtspaw` command or referenced by a playbook. If a workflow seems to require such
+  an artifact, stop and ask the admin instead.
 - Output only critical results/errors. Summarize logs > 20 lines. No verbose debugging.
 - Avoid hitting rate limits when calling APIs.
 
