@@ -218,6 +218,18 @@ mtspaw feature off --feature comment
 mtspaw feature remove --feature comment
 ```
 
+### Spam scan repeated-comment cluster
+
+After `mtspaw spam-scan query` writes `spam-pending.json`, build high-confidence repeated comment
+candidates:
+
+```
+mtspaw spam-scan cluster --minArticleSpread 3
+```
+
+This writes `spam-candidates.json` for comment patterns that appear across at least three different
+articles. Use `--dry-run` to inspect the candidate summary without writing the file.
+
 All feature commands also support interactive mode when called without --feature.
 
 `init-agent` seeds these known feature keys: `article`, `comment`,

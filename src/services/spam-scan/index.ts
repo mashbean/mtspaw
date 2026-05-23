@@ -55,6 +55,30 @@ interface SpamPending {
   articles: PendingArticle[]
 }
 
+interface SpamCandidateOccurrence {
+  articleId: string
+  shortHash: string
+  title: string
+  commentId: string
+  parentCommentId?: string
+  author: AuthorRef
+  content: string
+}
+
+interface SpamCandidate {
+  fingerprint: string
+  articleSpread: number
+  commentCount: number
+  reason: 'repeated_comment'
+  occurrences: SpamCandidateOccurrence[]
+}
+
+interface SpamCandidates {
+  generatedAt: string
+  minArticleSpread: number
+  candidates: SpamCandidate[]
+}
+
 interface SpammerOccurrence {
   type: 'article' | 'comment'
   contentId: string
@@ -89,6 +113,7 @@ const USERS_CAP = 100
 const channelsPath = () => path.resolve(process.cwd(), 'spam-scan-channels.json')
 const statePath = () => path.resolve(process.cwd(), 'spam-scan-state.json')
 const pendingPath = () => path.resolve(process.cwd(), 'spam-pending.json')
+const candidatesPath = () => path.resolve(process.cwd(), 'spam-candidates.json')
 const spammersPath = () => path.resolve(process.cwd(), 'spammers.json')
 
 const readChannels = (): SpamScanChannels => {
@@ -131,6 +156,10 @@ const readPending = (): SpamPending => {
 
 const writePending = (data: SpamPending) => {
   fs.writeFileSync(pendingPath(), JSON.stringify(data, null, 2))
+}
+
+const writeCandidates = (data: SpamCandidates) => {
+  fs.writeFileSync(candidatesPath(), JSON.stringify(data, null, 2))
 }
 
 const readSpammers = (): Spammers => {
@@ -188,6 +217,102 @@ const stripHtml = (html: string): string => {
     .trim()
 }
 
+const normalizeDomain = (rawUrl: string): string | null => {
+  try {
+    const url = new URL(rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`)
+    return url.hostname.replace(/^www\./, '').toLowerCase()
+  } catch {
+    return null
+  }
+}
+
+const extractSignal = (content: string): string | null => {
+  const normalized = content
+    .toLowerCase()
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  const urlMatch = normalized.match(/https?:\/\/[^\s)]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s)]*)?/i)
+  if (urlMatch) {
+    const domain = normalizeDomain(urlMatch[0])
+    if (domain) {
+      return `domain:${domain}`
+    }
+  }
+
+  const handleMatch = normalized.match(
+    /(?:line|telegram|tg|whatsapp|微信|wechat|賴|line\s*id)[:：\s@-]*([a-z0-9_.-]{4,})/i,
+  )
+  if (handleMatch?.[1]) {
+    return `contact:${handleMatch[1]}`
+  }
+
+  const compact = normalized.replace(/https?:\/\/[^\s)]+/g, '').replace(/[^\p{Letter}\p{Number}]+/gu, '')
+  if (compact.length < 16) {
+    return null
+  }
+  return `text:${compact.slice(0, 80)}`
+}
+
+const fingerprintComment = (comment: PendingComment): string | null => {
+  const signal = extractSignal(comment.content)
+  if (!signal) {
+    return null
+  }
+  return `${comment.author.userName}:${signal}`
+}
+
+const buildSpamCandidates = (pending: SpamPending, minArticleSpread = 3): SpamCandidates => {
+  const groups = new Map<string, SpamCandidateOccurrence[]>()
+
+  for (const article of pending.articles) {
+    for (const comment of article.comments) {
+      if (comment.communityWatchAction) {
+        continue
+      }
+      const fingerprint = fingerprintComment(comment)
+      if (!fingerprint) {
+        continue
+      }
+      const occurrence: SpamCandidateOccurrence = {
+        articleId: article.articleId,
+        shortHash: article.shortHash,
+        title: article.title,
+        commentId: comment.commentId,
+        author: comment.author,
+        content: comment.content,
+      }
+      if (comment.parentCommentId) {
+        occurrence.parentCommentId = comment.parentCommentId
+      }
+      const existing = groups.get(fingerprint) ?? []
+      existing.push(occurrence)
+      groups.set(fingerprint, existing)
+    }
+  }
+
+  const candidates = [...groups.entries()]
+    .map(([fingerprint, occurrences]) => {
+      const articleSpread = new Set(occurrences.map((o) => o.articleId)).size
+      return {
+        fingerprint,
+        articleSpread,
+        commentCount: occurrences.length,
+        reason: 'repeated_comment' as const,
+        occurrences,
+      }
+    })
+    .filter((c) => c.articleSpread >= minArticleSpread)
+    .sort((a, b) => b.articleSpread - a.articleSpread || b.commentCount - a.commentCount)
+
+  return {
+    generatedAt: new Date().toISOString(),
+    minArticleSpread,
+    candidates,
+  }
+}
+
 const formatTime = (iso: string | null | undefined): string => {
   if (!iso) {
     return ''
@@ -233,6 +358,8 @@ const formatUnreportedReport = (users: Record<string, SpammerUser>): { text: str
 }
 
 export {
+  buildSpamCandidates,
+  candidatesPath,
   channelsPath,
   formatUnreportedReport,
   isCommentBenign,
@@ -248,6 +375,7 @@ export {
   statePath,
   stripHtml,
   USERS_CAP,
+  writeCandidates,
   writePending,
   writeSpammers,
   writeState,
@@ -259,6 +387,9 @@ export type {
   PendingArticle,
   PendingComment,
   PendingCommentCW,
+  SpamCandidate,
+  SpamCandidateOccurrence,
+  SpamCandidates,
   SpammerOccurrence,
   Spammers,
   SpammerUser,

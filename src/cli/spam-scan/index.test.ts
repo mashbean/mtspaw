@@ -54,6 +54,7 @@ const fsStore = (fs as unknown as FsMockShape['default']).__store
 const channelsPath = `${process.cwd()}/spam-scan-channels.json`
 const statePath = `${process.cwd()}/spam-scan-state.json`
 const pendingPath = `${process.cwd()}/spam-pending.json`
+const candidatesPath = `${process.cwd()}/spam-candidates.json`
 const spammersPath = `${process.cwd()}/spammers.json`
 
 const setFile = (p: string, value: unknown) => {
@@ -323,6 +324,73 @@ describe('spam-scan query command', () => {
     expect(logged).toContain('--- spam-scan query dry-run (no write) ---')
     expect(logged.some((l) => l.includes('would enqueue: 1 articles'))).toBe(true)
     expect(logged.some((l) => l.includes('Article:a1') && l.includes('shortHash=ah1'))).toBe(true)
+  })
+})
+
+describe('spam-scan cluster command', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    fsStore.clear()
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit')
+    })
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-23T00:00:00.000Z'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('writes spam-candidates.json with repeated comment clusters', async () => {
+    setFile(pendingPath, {
+      articles: [1, 2, 3].map((n) => ({
+        articleId: `Article:a${n}`,
+        shortHash: `sh${n}`,
+        title: `Article ${n}`,
+        needsArticleJudgement: false,
+        author: { userId: `User:a${n}`, userName: `author${n}`, displayName: `Author ${n}` },
+        comments: [
+          {
+            commentId: `Comment:c${n}`,
+            content: '重複廣告請看 https://spam.example/path',
+            author: { userId: 'User:s', userName: 'spammer', displayName: 'Spammer' },
+            depth: 'top',
+            communityWatchAction: null,
+          },
+        ],
+      })),
+    })
+
+    await spamScanCommand.parseAsync(['cluster'], { from: 'user' })
+
+    const candidates = readFile(candidatesPath) as {
+      candidates: { fingerprint: string; articleSpread: number; commentCount: number }[]
+    }
+    expect(candidates.candidates).toHaveLength(1)
+    expect(candidates.candidates[0]).toMatchObject({
+      fingerprint: 'spammer:domain:spam.example',
+      articleSpread: 3,
+      commentCount: 3,
+    })
+  })
+
+  it('does not write candidates in dry-run mode', async () => {
+    setFile(pendingPath, { articles: [] })
+
+    await spamScanCommand.parseAsync(['cluster', '--dry-run'], { from: 'user' })
+
+    expect(readFile(candidatesPath)).toBeNull()
+  })
+
+  it('rejects article spread below 2', async () => {
+    await expect(spamScanCommand.parseAsync(['cluster', '--minArticleSpread', '1'], { from: 'user' })).rejects.toThrow(
+      'process.exit',
+    )
+    expect(console.error).toHaveBeenCalledWith('--minArticleSpread must be an integer >= 2')
   })
 })
 
