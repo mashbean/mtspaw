@@ -230,6 +230,15 @@ mtspaw spam-scan cluster --minArticleSpread 3
 This writes `spam-candidates.json` for comment patterns that appear across at least three different
 articles. Use `--dry-run` to inspect the candidate summary without writing the file.
 
+Build a dry-run Community Watch clean plan from those candidates:
+
+```
+mtspaw spam-scan plan-clean
+```
+
+This writes `spam-clean-plan.json` with planned comment IDs and the suggested reason. It does not
+remove comments.
+
 All feature commands also support interactive mode when called without --feature.
 
 `init-agent` seeds these known feature keys: `article`, `comment`,

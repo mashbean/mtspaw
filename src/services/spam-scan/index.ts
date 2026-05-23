@@ -79,6 +79,28 @@ interface SpamCandidates {
   candidates: SpamCandidate[]
 }
 
+type CommunityWatchSpamReason = 'flood_advertising' | 'pornographic_advertising'
+
+interface SpamCleanPlanItem {
+  commentId: string
+  parentCommentId?: string
+  articleId: string
+  shortHash: string
+  title: string
+  author: AuthorRef
+  content: string
+  fingerprint: string
+  reason: CommunityWatchSpamReason
+  reasonLabel: '濫發廣告' | '色情廣告'
+}
+
+interface SpamCleanPlan {
+  generatedAt: string
+  sourceGeneratedAt: string
+  dryRunOnly: true
+  items: SpamCleanPlanItem[]
+}
+
 interface SpammerOccurrence {
   type: 'article' | 'comment'
   contentId: string
@@ -114,6 +136,7 @@ const channelsPath = () => path.resolve(process.cwd(), 'spam-scan-channels.json'
 const statePath = () => path.resolve(process.cwd(), 'spam-scan-state.json')
 const pendingPath = () => path.resolve(process.cwd(), 'spam-pending.json')
 const candidatesPath = () => path.resolve(process.cwd(), 'spam-candidates.json')
+const cleanPlanPath = () => path.resolve(process.cwd(), 'spam-clean-plan.json')
 const spammersPath = () => path.resolve(process.cwd(), 'spammers.json')
 
 const readChannels = (): SpamScanChannels => {
@@ -160,6 +183,18 @@ const writePending = (data: SpamPending) => {
 
 const writeCandidates = (data: SpamCandidates) => {
   fs.writeFileSync(candidatesPath(), JSON.stringify(data, null, 2))
+}
+
+const readCandidates = (): SpamCandidates => {
+  const p = candidatesPath()
+  if (!fs.existsSync(p)) {
+    return { generatedAt: '', minArticleSpread: 3, candidates: [] }
+  }
+  return JSON.parse(fs.readFileSync(p, 'utf-8'))
+}
+
+const writeCleanPlan = (data: SpamCleanPlan) => {
+  fs.writeFileSync(cleanPlanPath(), JSON.stringify(data, null, 2))
 }
 
 const readSpammers = (): Spammers => {
@@ -313,6 +348,43 @@ const buildSpamCandidates = (pending: SpamPending, minArticleSpread = 3): SpamCa
   }
 }
 
+const buildSpamCleanPlan = (source: SpamCandidates): SpamCleanPlan => {
+  const seen = new Set<string>()
+  const items: SpamCleanPlanItem[] = []
+
+  for (const candidate of source.candidates) {
+    for (const occurrence of candidate.occurrences) {
+      if (seen.has(occurrence.commentId)) {
+        continue
+      }
+      seen.add(occurrence.commentId)
+
+      const item: SpamCleanPlanItem = {
+        commentId: occurrence.commentId,
+        articleId: occurrence.articleId,
+        shortHash: occurrence.shortHash,
+        title: occurrence.title,
+        author: occurrence.author,
+        content: occurrence.content,
+        fingerprint: candidate.fingerprint,
+        reason: 'flood_advertising',
+        reasonLabel: '濫發廣告',
+      }
+      if (occurrence.parentCommentId) {
+        item.parentCommentId = occurrence.parentCommentId
+      }
+      items.push(item)
+    }
+  }
+
+  return {
+    generatedAt: new Date().toISOString(),
+    sourceGeneratedAt: source.generatedAt,
+    dryRunOnly: true,
+    items,
+  }
+}
+
 const formatTime = (iso: string | null | undefined): string => {
   if (!iso) {
     return ''
@@ -359,13 +431,16 @@ const formatUnreportedReport = (users: Record<string, SpammerUser>): { text: str
 
 export {
   buildSpamCandidates,
+  buildSpamCleanPlan,
   candidatesPath,
   channelsPath,
+  cleanPlanPath,
   formatUnreportedReport,
   isCommentBenign,
   OCCURRENCES_CAP,
   pendingPath,
   prunedState,
+  readCandidates,
   readChannels,
   readPending,
   readSpammers,
@@ -376,6 +451,7 @@ export {
   stripHtml,
   USERS_CAP,
   writeCandidates,
+  writeCleanPlan,
   writePending,
   writeSpammers,
   writeState,
@@ -384,12 +460,15 @@ export type {
   AuthorRef,
   ChannelFeed,
   CommunityWatchHistory,
+  CommunityWatchSpamReason,
   PendingArticle,
   PendingComment,
   PendingCommentCW,
   SpamCandidate,
   SpamCandidateOccurrence,
   SpamCandidates,
+  SpamCleanPlan,
+  SpamCleanPlanItem,
   SpammerOccurrence,
   Spammers,
   SpammerUser,
