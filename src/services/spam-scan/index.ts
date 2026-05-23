@@ -210,6 +210,7 @@ const writeSpammers = (data: Spammers) => {
 }
 
 const MIN_MEANINGFUL_LENGTH = 5
+const FIRST_PARTY_DOMAINS = new Set(['matters.town', 'matters.news', 'matters.icu'])
 
 const isCommentBenign = (content: string): boolean => {
   const trimmed = content.trim()
@@ -271,7 +272,7 @@ const extractSignal = (content: string): string | null => {
   const urlMatch = normalized.match(/https?:\/\/[^\s)]+|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s)]*)?/i)
   if (urlMatch) {
     const domain = normalizeDomain(urlMatch[0])
-    if (domain) {
+    if (domain && !FIRST_PARTY_DOMAINS.has(domain)) {
       return `domain:${domain}`
     }
   }

@@ -55,4 +55,15 @@ describe('buildSpamCandidates', () => {
 
     expect(result.candidates).toHaveLength(0)
   })
+
+  it('does not cluster repeated first-party article links as spam domains', () => {
+    const pending = makePending()
+    for (const article of pending.articles) {
+      article.comments[0].content = '正常留言，延伸閱讀 https://matters.town/a/example'
+    }
+
+    const result = buildSpamCandidates(pending, 3)
+
+    expect(result.candidates).toHaveLength(0)
+  })
 })
