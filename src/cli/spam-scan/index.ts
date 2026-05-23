@@ -16,10 +16,12 @@ import type {
 } from '../../services/spam-scan/index.js'
 import {
   buildSpamCandidates,
+  buildSpamCleanPlan,
   formatUnreportedReport,
   isCommentBenign,
   OCCURRENCES_CAP,
   prunedState,
+  readCandidates,
   readChannels,
   readPending,
   readSpammers,
@@ -27,6 +29,7 @@ import {
   stripHtml,
   USERS_CAP,
   writeCandidates,
+  writeCleanPlan,
   writePending,
   writeSpammers,
   writeState,
@@ -576,6 +579,23 @@ const clusterCommand = new Command('cluster')
     }
   })
 
+const planCleanCommand = new Command('plan-clean')
+  .description('Build a dry-run community-watch clean plan from spam-candidates.json')
+  .action(async () => {
+    const candidates = readCandidates()
+    const plan = buildSpamCleanPlan(candidates)
+
+    console.log(`spam-scan plan-clean: ${plan.items.length} comments planned (dry-run only)`)
+    for (const item of plan.items.slice(0, 20)) {
+      console.log(`- ${item.reasonLabel} ${item.shortHash} ${item.commentId} @${item.author.userName}`)
+    }
+    if (plan.items.length > 20) {
+      console.log(`... ${plan.items.length - 20} more`)
+    }
+
+    writeCleanPlan(plan)
+  })
+
 const noteCwCommand = new Command('note-cw')
   .description('Update communityWatchHistory on existing spammer; no-op when user not in roster')
   .option('--userName <name>', 'Spammer userName')
@@ -806,6 +826,7 @@ spamScanCommand.addCommand(queryCommand)
 spamScanCommand.addCommand(recordCommand)
 spamScanCommand.addCommand(markScannedCommand)
 spamScanCommand.addCommand(clusterCommand)
+spamScanCommand.addCommand(planCleanCommand)
 spamScanCommand.addCommand(noteCwCommand)
 spamScanCommand.addCommand(listUnreportedCommand)
 spamScanCommand.addCommand(markReportedCommand)

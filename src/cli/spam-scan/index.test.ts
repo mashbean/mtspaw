@@ -55,6 +55,7 @@ const channelsPath = `${process.cwd()}/spam-scan-channels.json`
 const statePath = `${process.cwd()}/spam-scan-state.json`
 const pendingPath = `${process.cwd()}/spam-pending.json`
 const candidatesPath = `${process.cwd()}/spam-candidates.json`
+const cleanPlanPath = `${process.cwd()}/spam-clean-plan.json`
 const spammersPath = `${process.cwd()}/spammers.json`
 
 const setFile = (p: string, value: unknown) => {
@@ -391,6 +392,60 @@ describe('spam-scan cluster command', () => {
       'process.exit',
     )
     expect(console.error).toHaveBeenCalledWith('--minArticleSpread must be an integer >= 2')
+  })
+})
+
+describe('spam-scan plan-clean command', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    fsStore.clear()
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit')
+    })
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-23T01:00:00.000Z'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('writes a dry-run clean plan from spam-candidates.json', async () => {
+    setFile(candidatesPath, {
+      generatedAt: '2026-05-23T00:00:00.000Z',
+      minArticleSpread: 3,
+      candidates: [
+        {
+          fingerprint: 'spammer:domain:spam.example',
+          articleSpread: 3,
+          commentCount: 1,
+          reason: 'repeated_comment',
+          occurrences: [
+            {
+              articleId: 'Article:a1',
+              shortHash: 'sh1',
+              title: 'Article 1',
+              commentId: 'Comment:c1',
+              author: { userId: 'User:s', userName: 'spammer', displayName: 'Spammer' },
+              content: 'spam https://spam.example',
+            },
+          ],
+        },
+      ],
+    })
+
+    await spamScanCommand.parseAsync(['plan-clean'], { from: 'user' })
+
+    const plan = readFile(cleanPlanPath) as {
+      dryRunOnly: boolean
+      items: { commentId: string; reasonLabel: string; shortHash: string }[]
+    }
+    expect(plan.dryRunOnly).toBe(true)
+    expect(plan.items).toHaveLength(1)
+    expect(plan.items[0]).toMatchObject({ commentId: 'Comment:c1', reasonLabel: '濫發廣告', shortHash: 'sh1' })
   })
 })
 
