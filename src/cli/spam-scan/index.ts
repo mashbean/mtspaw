@@ -15,15 +15,18 @@ import type {
   SpamScanState,
 } from '../../services/spam-scan/index.js'
 import {
+  buildSpamCandidates,
   formatUnreportedReport,
   isCommentBenign,
   OCCURRENCES_CAP,
   prunedState,
   readChannels,
+  readPending,
   readSpammers,
   readState,
   stripHtml,
   USERS_CAP,
+  writeCandidates,
   writePending,
   writeSpammers,
   writeState,
@@ -541,6 +544,38 @@ const markScannedCommand = new Command('mark-scanned')
     console.log(`mark-scanned ${articleId}${spam ? ' (spam)' : ''}`)
   })
 
+const clusterCommand = new Command('cluster')
+  .description('Build repeated spam comment candidates from spam-pending.json')
+  .option('--minArticleSpread <number>', 'Minimum number of different articles hit by the same pattern', '3')
+  .option('--dry-run', 'Print candidate summary without writing spam-candidates.json')
+  .action(async (opts: { minArticleSpread?: string; dryRun?: boolean }) => {
+    const minArticleSpread = Number(opts.minArticleSpread)
+    if (!Number.isInteger(minArticleSpread) || minArticleSpread < 2) {
+      console.error('--minArticleSpread must be an integer >= 2')
+      process.exit(1)
+    }
+
+    const pending = readPending()
+    const result = buildSpamCandidates(pending, minArticleSpread)
+
+    console.log(
+      `spam-scan cluster: ${result.candidates.length} candidates (minArticleSpread=${result.minArticleSpread})`,
+    )
+    for (const candidate of result.candidates) {
+      const first = candidate.occurrences[0]
+      console.log(
+        `- ${candidate.fingerprint} articles=${candidate.articleSpread} comments=${candidate.commentCount} author=@${first.author.userName}`,
+      )
+      for (const occurrence of candidate.occurrences.slice(0, 3)) {
+        console.log(`  ${occurrence.shortHash} ${occurrence.commentId}`)
+      }
+    }
+
+    if (!opts.dryRun) {
+      writeCandidates(result)
+    }
+  })
+
 const noteCwCommand = new Command('note-cw')
   .description('Update communityWatchHistory on existing spammer; no-op when user not in roster')
   .option('--userName <name>', 'Spammer userName')
@@ -770,6 +805,7 @@ const spamScanCommand = new Command('spam-scan').description('Spam article and c
 spamScanCommand.addCommand(queryCommand)
 spamScanCommand.addCommand(recordCommand)
 spamScanCommand.addCommand(markScannedCommand)
+spamScanCommand.addCommand(clusterCommand)
 spamScanCommand.addCommand(noteCwCommand)
 spamScanCommand.addCommand(listUnreportedCommand)
 spamScanCommand.addCommand(markReportedCommand)

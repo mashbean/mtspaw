@@ -18,6 +18,10 @@ Version: 0.8
 
 2. Run `mtspaw spam-scan query` to refresh spam-pending.json.
 
+2-1. Run `mtspaw spam-scan cluster --minArticleSpread 3` to write spam-candidates.json.
+    This catches repeated comment patterns that appear across at least 3 different articles.
+    Treat spam-candidates.json as the high-confidence review queue before judging individual comments.
+
 3. Read spam-pending.json
     3-1. If the file does not exist or its `articles` array is empty then skip directly to Step 6
         so cleanup and report still run for any unreported spammers from a previous cycle.
