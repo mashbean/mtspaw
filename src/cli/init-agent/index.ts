@@ -35,6 +35,7 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
       { name: 'wallet', value: 'wallet' },
       { name: 'donate', value: 'donate' },
       { name: 'spam_scan', value: 'spam_scan' },
+      { name: 'community_watch', value: 'community_watch' },
     ],
   })
 
@@ -67,6 +68,7 @@ const initAgentCommand = new Command('init-agent').description('Initialize a new
       wallet: enabledFeatures.includes('wallet'),
       donate: enabledFeatures.includes('donate'),
       spam_scan: enabledFeatures.includes('spam_scan'),
+      community_watch: enabledFeatures.includes('community_watch'),
     },
     thresholds: {
       comment: 80,

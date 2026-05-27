@@ -15,6 +15,8 @@ Version: 0.8
 1. Read env.json
     1-1. Read features.spam_scan into FLAG.
     1-2. If FLAG is false then stop and finish.
+    1-3. Before running `submit-clean --execute`, read features.community_watch into CW_FLAG.
+    1-4. If CW_FLAG is false then do not execute Community Watch mutations.
 
 2. Run `mtspaw spam-scan query` to refresh spam-pending.json.
 
@@ -28,7 +30,9 @@ Version: 0.8
 2-3. If spam-clean-plan.json contains high-confidence repeated comments and a human operator approves
     the list, run `mtspaw spam-scan submit-clean --execute` to submit those comments through
     `communityWatchRemoveComment`. Without `--execute`, this command only writes spam-clean-result.json
-    as a dry-run preview. After execution, inspect spam-clean-result.json before continuing.
+    as a dry-run preview. Execution skips comments that are no longer active, already have a Community
+    Watch action, or were removed in the previous result file. After execution, inspect
+    spam-clean-result.json before continuing.
 
 3. Read spam-pending.json
     3-1. If the file does not exist or its `articles` array is empty then skip directly to Step 6

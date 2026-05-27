@@ -9,6 +9,7 @@ import type {
   PendingArticle,
   PendingComment,
   PendingCommentCW,
+  SpamCleanPlanItem,
   SpamCleanResult,
   SpamCleanResultItem,
   SpammerOccurrence,
@@ -26,6 +27,7 @@ import {
   readCandidates,
   readChannels,
   readCleanPlan,
+  readCleanResult,
   readPending,
   readSpammers,
   readState,
@@ -137,6 +139,21 @@ const COMMUNITY_WATCH_REMOVE_COMMENT_MUTATION = `
       communityWatchAction {
         uuid
         createdAt
+      }
+    }
+  }
+`
+
+const COMMENT_LOOKUP_WITH_CW_QUERY = `
+  query SpamScanCommentLookupWithCW($input: NodeInput!) {
+    node(input: $input) {
+      ... on Comment {
+        id
+        state
+        communityWatchAction {
+          uuid
+          createdAt
+        }
       }
     }
   }
@@ -667,6 +684,30 @@ const parsePositiveInteger = (value: string | undefined, label: string): number 
   return parsed
 }
 
+const hasCommunityWatchFeature = (envJson: Record<string, unknown>): boolean => {
+  const features = envJson.features
+  if (!features || typeof features !== 'object') {
+    return false
+  }
+  const flags = features as Record<string, unknown>
+  return flags.community_watch === true || flags.communityWatch === true
+}
+
+const toSkippedCleanResultItem = (
+  item: SpamCleanPlanItem,
+  error: string,
+  action?: { uuid?: string; createdAt?: string } | null,
+): SpamCleanResultItem => ({
+  commentId: item.commentId,
+  shortHash: item.shortHash,
+  author: item.author,
+  reason: item.reason,
+  status: 'skipped',
+  uuid: action?.uuid,
+  createdAt: action?.createdAt,
+  error,
+})
+
 const submitCleanCommand = new Command('submit-clean')
   .description('Submit spam-clean-plan.json through communityWatchRemoveComment')
   .option('--execute', 'Actually remove comments; without this flag only writes a dry-run result')
@@ -686,6 +727,7 @@ const submitCleanCommand = new Command('submit-clean')
         total: 0,
         removed: 0,
         failed: 0,
+        skipped: 0,
         dryRun: 0,
         items: [],
       }
@@ -709,6 +751,7 @@ const submitCleanCommand = new Command('submit-clean')
         total: resultItems.length,
         removed: 0,
         failed: 0,
+        skipped: 0,
         dryRun: resultItems.length,
         items: resultItems,
       })
@@ -720,12 +763,71 @@ const submitCleanCommand = new Command('submit-clean')
 
     const envJsonPath = requireEnvJson()
     const envJson = readEnvJson(envJsonPath)
+    if (!hasCommunityWatchFeature(envJson)) {
+      console.error('Feature community_watch is not enabled in env.json')
+      process.exit(1)
+    }
     const mattersApi = requireMattersApi(envJson)
+    const previousResult = readCleanResult()
+    const previouslyRemoved = new Set(
+      previousResult.items.filter((item) => item.status === 'removed').map((item) => item.commentId),
+    )
     const resultItems: SpamCleanResultItem[] = []
+    let mutationCount = 0
 
     for (let i = 0; i < items.length; i += 1) {
       const item = items[i]
-      if (i > 0) {
+
+      if (previouslyRemoved.has(item.commentId)) {
+        resultItems.push(toSkippedCleanResultItem(item, 'Already removed in previous spam-clean-result.json'))
+        continue
+      }
+
+      const lookup = await fetchGqlWithAuthRetry(envJsonPath, mattersApi, COMMENT_LOOKUP_WITH_CW_QUERY, {
+        input: { id: item.commentId },
+      })
+      if (lookup.errorMessage) {
+        resultItems.push({
+          commentId: item.commentId,
+          shortHash: item.shortHash,
+          author: item.author,
+          reason: item.reason,
+          status: 'failed',
+          error: `Comment lookup failed: ${lookup.errorMessage}`,
+        })
+        console.error(`submit-clean lookup failed: ${item.shortHash} ${item.commentId}: ${lookup.errorMessage}`)
+        continue
+      }
+      const target = (
+        lookup.result as {
+          data?: {
+            node?: {
+              id?: string
+              state?: string
+              communityWatchAction?: {
+                uuid?: string
+                createdAt?: string
+              } | null
+            } | null
+          }
+        }
+      )?.data?.node
+      if (!target?.id) {
+        resultItems.push(toSkippedCleanResultItem(item, `Comment not found: ${item.commentId}`))
+        continue
+      }
+      if (target.state !== 'active') {
+        resultItems.push(toSkippedCleanResultItem(item, `Comment is not active (state: ${target.state ?? 'unknown'})`))
+        continue
+      }
+      if (target.communityWatchAction?.uuid) {
+        resultItems.push(
+          toSkippedCleanResultItem(item, 'Comment already has a Community Watch action', target.communityWatchAction),
+        )
+        continue
+      }
+
+      if (mutationCount > 0) {
         await delay(intervalMs)
       }
       const { result, errorMessage } = await fetchGqlWithAuthRetry(
@@ -739,6 +841,7 @@ const submitCleanCommand = new Command('submit-clean')
           },
         },
       )
+      mutationCount += 1
       if (errorMessage) {
         resultItems.push({
           commentId: item.commentId,
@@ -776,6 +879,7 @@ const submitCleanCommand = new Command('submit-clean')
 
     const removed = resultItems.filter((item) => item.status === 'removed').length
     const failed = resultItems.filter((item) => item.status === 'failed').length
+    const skipped = resultItems.filter((item) => item.status === 'skipped').length
     writeCleanResult({
       generatedAt: new Date().toISOString(),
       sourceGeneratedAt: cleanPlan.sourceGeneratedAt,
@@ -783,10 +887,11 @@ const submitCleanCommand = new Command('submit-clean')
       total: resultItems.length,
       removed,
       failed,
+      skipped,
       dryRun: 0,
       items: resultItems,
     })
-    console.log(`spam-scan submit-clean: removed ${removed}, failed ${failed}`)
+    console.log(`spam-scan submit-clean: removed ${removed}, skipped ${skipped}, failed ${failed}`)
     if (failed > 0) {
       process.exit(1)
     }

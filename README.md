@@ -246,13 +246,14 @@ mtspaw spam-scan submit-clean --execute
 ```
 
 Without `--execute`, the command only writes `spam-clean-result.json` as a dry-run preview. With
-`--execute`, it calls `communityWatchRemoveComment` for each planned comment and records per-comment
-success or failure in `spam-clean-result.json`.
+`--execute`, it requires `features.community_watch` in env.json, checks each comment is still active
+and has no existing Community Watch action, then calls `communityWatchRemoveComment` for each eligible
+planned comment. The result file records removed, skipped, and failed items.
 
 All feature commands also support interactive mode when called without --feature.
 
 `init-agent` seeds these known feature keys: `article`, `comment`,
-`comment_like`, `comment_reply`, `wallet`, `donate`, `spam_scan`. Playbooks read
+`comment_like`, `comment_reply`, `wallet`, `donate`, `spam_scan`, `community_watch`. Playbooks read
 these flags to decide whether the agent is permitted to perform the corresponding action.
 
 ### Threshold management
@@ -359,10 +360,12 @@ occurrences, and a community-watch annotation when applicable).
 pipeline forwards `list-unreported` output and runs `mark-reported --all` on success.
 
 `submit-clean` reads `spam-clean-plan.json`. By default it does not mutate Matters and only writes
-`spam-clean-result.json` with `dry_run` entries. With `--execute`, it submits each planned comment
-through `communityWatchRemoveComment`, mapping `flood_advertising` to `spam_ad` and
-`pornographic_advertising` to `porn_ad`. It exits non-zero if any item fails, but still writes the
-full result file for retry and audit.
+`spam-clean-result.json` with `dry_run` entries. With `--execute`, it requires
+`features.community_watch`, skips comments already removed in the previous result file, skips comments
+that are no longer active, skips comments with existing Community Watch actions, and submits the
+remaining comments through `communityWatchRemoveComment`, mapping `flood_advertising` to `spam_ad`
+and `pornographic_advertising` to `porn_ad`. It exits non-zero if any item fails, but still writes
+the full result file for retry and audit.
 
 `report` is the integrated Slack flow: it builds the same plain-text body as `list-unreported`, POSTs
 to `https://slack.com/api/chat.postMessage` with the bearer token, and flips `reported: true` on every

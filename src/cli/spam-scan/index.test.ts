@@ -3,7 +3,10 @@ import fs from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../services/auth/index.js', () => ({
-  readEnvJson: vi.fn(() => ({ mattersApi: 'https://api.test' })),
+  readEnvJson: vi.fn(() => ({
+    mattersApi: 'https://api.test',
+    features: { community_watch: true },
+  })),
   requireEnvJson: vi.fn(() => '/test/env.json'),
   requireMattersApi: vi.fn((envJson: Record<string, unknown>) => envJson.mattersApi as string),
   fetchGqlWithAuthRetry: vi.fn(),
@@ -588,28 +591,41 @@ describe('spam-scan submit-clean command', () => {
 
   it('submits planned comments with communityWatchRemoveComment when executed', async () => {
     seedCleanPlan()
-    vi.mocked(fetchGqlWithAuthRetry).mockResolvedValueOnce({
-      result: {
-        data: {
-          communityWatchRemoveComment: {
-            id: 'Comment:c1',
-            state: 'banned',
-            communityWatchAction: {
-              uuid: 'cw-1',
-              createdAt: '2026-05-23T02:00:00.000Z',
+    vi.mocked(fetchGqlWithAuthRetry)
+      .mockResolvedValueOnce({
+        result: {
+          data: {
+            node: {
+              id: 'Comment:c1',
+              state: 'active',
+              communityWatchAction: null,
             },
           },
         },
-      },
-      errorMessage: null,
-    })
+        errorMessage: null,
+      })
+      .mockResolvedValueOnce({
+        result: {
+          data: {
+            communityWatchRemoveComment: {
+              id: 'Comment:c1',
+              state: 'banned',
+              communityWatchAction: {
+                uuid: 'cw-1',
+                createdAt: '2026-05-23T02:00:00.000Z',
+              },
+            },
+          },
+        },
+        errorMessage: null,
+      })
 
     await spamScanCommand.parseAsync(['submit-clean', '--execute'], {
       from: 'user',
     })
 
-    expect(fetchGqlWithAuthRetry).toHaveBeenCalledTimes(1)
-    const call = vi.mocked(fetchGqlWithAuthRetry).mock.calls[0]
+    expect(fetchGqlWithAuthRetry).toHaveBeenCalledTimes(2)
+    const call = vi.mocked(fetchGqlWithAuthRetry).mock.calls[1]
     expect(call[2]).toContain('communityWatchRemoveComment')
     expect(call[3]).toEqual({ input: { id: 'Comment:c1', reason: 'spam_ad' } })
     const result = readFile(cleanResultPath) as {
@@ -628,12 +644,25 @@ describe('spam-scan submit-clean command', () => {
 
   it('writes failures and exits non-zero when any mutation fails', async () => {
     seedCleanPlan()
-    vi.mocked(fetchGqlWithAuthRetry).mockResolvedValueOnce({
-      result: {
-        errors: [{ message: 'viewer is not a Community Watch member' }],
-      },
-      errorMessage: 'viewer is not a Community Watch member',
-    })
+    vi.mocked(fetchGqlWithAuthRetry)
+      .mockResolvedValueOnce({
+        result: {
+          data: {
+            node: {
+              id: 'Comment:c1',
+              state: 'active',
+              communityWatchAction: null,
+            },
+          },
+        },
+        errorMessage: null,
+      })
+      .mockResolvedValueOnce({
+        result: {
+          errors: [{ message: 'viewer is not a Community Watch member' }],
+        },
+        errorMessage: 'viewer is not a Community Watch member',
+      })
 
     await expect(
       spamScanCommand.parseAsync(['submit-clean', '--execute'], {
@@ -659,12 +688,89 @@ describe('spam-scan submit-clean command', () => {
       ...plan,
       items: [...plan.items, { ...(plan.items[0] as object), commentId: 'Comment:c2' }],
     })
-    vi.mocked(fetchGqlWithAuthRetry).mockResolvedValue({
+    vi.mocked(fetchGqlWithAuthRetry)
+      .mockResolvedValueOnce({
+        result: {
+          data: {
+            node: {
+              id: 'Comment:c1',
+              state: 'active',
+              communityWatchAction: null,
+            },
+          },
+        },
+        errorMessage: null,
+      })
+      .mockResolvedValueOnce({
+        result: {
+          data: {
+            communityWatchRemoveComment: {
+              id: 'Comment:c1',
+              state: 'banned',
+              communityWatchAction: null,
+            },
+          },
+        },
+        errorMessage: null,
+      })
+      .mockResolvedValueOnce({
+        result: {
+          data: {
+            node: {
+              id: 'Comment:c2',
+              state: 'active',
+              communityWatchAction: null,
+            },
+          },
+        },
+        errorMessage: null,
+      })
+      .mockResolvedValueOnce({
+        result: {
+          data: {
+            communityWatchRemoveComment: {
+              id: 'Comment:c2',
+              state: 'banned',
+              communityWatchAction: null,
+            },
+          },
+        },
+        errorMessage: null,
+      })
+
+    await spamScanCommand.parseAsync(['submit-clean', '--execute', '--limit', '2', '--intervalMs', '250'], {
+      from: 'user',
+    })
+
+    expect(fetchGqlWithAuthRetry).toHaveBeenCalledTimes(4)
+    expect(delay).toHaveBeenCalledWith(250)
+  })
+
+  it('requires community_watch feature before executing', async () => {
+    seedCleanPlan()
+    vi.mocked(readEnvJson).mockReturnValueOnce({
+      mattersApi: 'https://api.test',
+      features: { community_watch: false },
+    })
+
+    await expect(
+      spamScanCommand.parseAsync(['submit-clean', '--execute'], {
+        from: 'user',
+      }),
+    ).rejects.toThrow('process.exit')
+
+    expect(console.error).toHaveBeenCalledWith('Feature community_watch is not enabled in env.json')
+    expect(fetchGqlWithAuthRetry).not.toHaveBeenCalled()
+  })
+
+  it('skips comments that are no longer active', async () => {
+    seedCleanPlan()
+    vi.mocked(fetchGqlWithAuthRetry).mockResolvedValueOnce({
       result: {
         data: {
-          communityWatchRemoveComment: {
+          node: {
             id: 'Comment:c1',
-            state: 'banned',
+            state: 'archived',
             communityWatchAction: null,
           },
         },
@@ -672,12 +778,96 @@ describe('spam-scan submit-clean command', () => {
       errorMessage: null,
     })
 
-    await spamScanCommand.parseAsync(['submit-clean', '--execute', '--limit', '2', '--intervalMs', '250'], {
+    await spamScanCommand.parseAsync(['submit-clean', '--execute'], {
       from: 'user',
     })
 
-    expect(fetchGqlWithAuthRetry).toHaveBeenCalledTimes(2)
-    expect(delay).toHaveBeenCalledWith(250)
+    expect(fetchGqlWithAuthRetry).toHaveBeenCalledTimes(1)
+    const result = readFile(cleanResultPath) as {
+      skipped: number
+      items: { status: string; error: string }[]
+    }
+    expect(result.skipped).toBe(1)
+    expect(result.items[0]).toMatchObject({
+      status: 'skipped',
+      error: 'Comment is not active (state: archived)',
+    })
+  })
+
+  it('skips comments that already have community watch actions', async () => {
+    seedCleanPlan()
+    vi.mocked(fetchGqlWithAuthRetry).mockResolvedValueOnce({
+      result: {
+        data: {
+          node: {
+            id: 'Comment:c1',
+            state: 'active',
+            communityWatchAction: {
+              uuid: 'cw-existing',
+              createdAt: '2026-05-23T01:30:00.000Z',
+            },
+          },
+        },
+      },
+      errorMessage: null,
+    })
+
+    await spamScanCommand.parseAsync(['submit-clean', '--execute'], {
+      from: 'user',
+    })
+
+    expect(fetchGqlWithAuthRetry).toHaveBeenCalledTimes(1)
+    const result = readFile(cleanResultPath) as {
+      skipped: number
+      items: { status: string; uuid: string }[]
+    }
+    expect(result.skipped).toBe(1)
+    expect(result.items[0]).toMatchObject({
+      status: 'skipped',
+      uuid: 'cw-existing',
+    })
+  })
+
+  it('skips comments already removed in the previous result file', async () => {
+    seedCleanPlan()
+    setFile(cleanResultPath, {
+      generatedAt: '2026-05-23T01:10:00.000Z',
+      sourceGeneratedAt: '2026-05-23T00:00:00.000Z',
+      execute: true,
+      total: 1,
+      removed: 1,
+      failed: 0,
+      dryRun: 0,
+      items: [
+        {
+          commentId: 'Comment:c1',
+          shortHash: 'sh1',
+          author: {
+            userId: 'User:s',
+            userName: 'spammer',
+            displayName: 'Spammer',
+          },
+          reason: 'flood_advertising',
+          status: 'removed',
+          uuid: 'cw-previous',
+        },
+      ],
+    })
+
+    await spamScanCommand.parseAsync(['submit-clean', '--execute'], {
+      from: 'user',
+    })
+
+    expect(fetchGqlWithAuthRetry).not.toHaveBeenCalled()
+    const result = readFile(cleanResultPath) as {
+      skipped: number
+      items: { status: string; error: string }[]
+    }
+    expect(result.skipped).toBe(1)
+    expect(result.items[0]).toMatchObject({
+      status: 'skipped',
+      error: 'Already removed in previous spam-clean-result.json',
+    })
   })
 })
 

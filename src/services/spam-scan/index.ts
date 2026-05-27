@@ -101,7 +101,7 @@ interface SpamCleanPlan {
   items: SpamCleanPlanItem[]
 }
 
-type SpamCleanResultStatus = 'dry_run' | 'removed' | 'failed'
+type SpamCleanResultStatus = 'dry_run' | 'removed' | 'failed' | 'skipped'
 
 interface SpamCleanResultItem {
   commentId: string
@@ -121,6 +121,7 @@ interface SpamCleanResult {
   total: number
   removed: number
   failed: number
+  skipped: number
   dryRun: number
   items: SpamCleanResultItem[]
 }
@@ -237,6 +238,29 @@ const readCleanPlan = (): SpamCleanPlan => {
 
 const writeCleanResult = (data: SpamCleanResult) => {
   fs.writeFileSync(cleanResultPath(), JSON.stringify(data, null, 2))
+}
+
+const readCleanResult = (): SpamCleanResult => {
+  const p = cleanResultPath()
+  if (!fs.existsSync(p)) {
+    return {
+      generatedAt: '',
+      sourceGeneratedAt: '',
+      execute: false,
+      total: 0,
+      removed: 0,
+      failed: 0,
+      skipped: 0,
+      dryRun: 0,
+      items: [],
+    }
+  }
+  const parsed = JSON.parse(fs.readFileSync(p, 'utf-8'))
+  return {
+    ...parsed,
+    skipped:
+      parsed.skipped ?? parsed.items?.filter((item: SpamCleanResultItem) => item.status === 'skipped').length ?? 0,
+  }
 }
 
 const readSpammers = (): Spammers => {
@@ -490,6 +514,7 @@ export {
   readCandidates,
   readChannels,
   readCleanPlan,
+  readCleanResult,
   readPending,
   readSpammers,
   readState,
