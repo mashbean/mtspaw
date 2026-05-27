@@ -239,10 +239,21 @@ mtspaw spam-scan plan-clean
 This writes `spam-clean-plan.json` with planned comment IDs and the suggested reason. It does not
 remove comments.
 
+After human review, submit the clean plan through the Community Watch mutation:
+
+```
+mtspaw spam-scan submit-clean --execute
+```
+
+Without `--execute`, the command only writes `spam-clean-result.json` as a dry-run preview. With
+`--execute`, it requires `features.community_watch` in env.json, checks each comment is still active
+and has no existing Community Watch action, then calls `communityWatchRemoveComment` for each eligible
+planned comment. The result file records removed, skipped, and failed items.
+
 All feature commands also support interactive mode when called without --feature.
 
 `init-agent` seeds these known feature keys: `article`, `comment`,
-`comment_like`, `comment_reply`, `wallet`, `donate`, `spam_scan`. Playbooks read
+`comment_like`, `comment_reply`, `wallet`, `donate`, `spam_scan`, `community_watch`. Playbooks read
 these flags to decide whether the agent is permitted to perform the corresponding action.
 
 ### Threshold management
@@ -314,6 +325,9 @@ in `spammers.json`, and produces plain-text output for an external telegram pipe
 
 ```
 mtspaw spam-scan query [--dry-run]
+mtspaw spam-scan cluster --minArticleSpread 3
+mtspaw spam-scan plan-clean
+mtspaw spam-scan submit-clean [--execute] [--limit <number>] [--intervalMs <number>]
 mtspaw spam-scan record --userName <name> --displayName <name> --type article|comment --contentId <id> --shortHash <hash>
 mtspaw spam-scan mark-scanned --articleId <id> --shortHash <hash> [--spam]
 mtspaw spam-scan note-cw --userName <name> --uuid <uuid> --createdAt <iso>
@@ -344,6 +358,14 @@ not already in the roster.
 occurrences, and a community-watch annotation when applicable).
 `mark-reported` flips `reported: true` on a single user or on every unreported entry. The external
 pipeline forwards `list-unreported` output and runs `mark-reported --all` on success.
+
+`submit-clean` reads `spam-clean-plan.json`. By default it does not mutate Matters and only writes
+`spam-clean-result.json` with `dry_run` entries. With `--execute`, it requires
+`features.community_watch`, skips comments already removed in the previous result file, skips comments
+that are no longer active, skips comments with existing Community Watch actions, and submits the
+remaining comments through `communityWatchRemoveComment`, mapping `flood_advertising` to `spam_ad`
+and `pornographic_advertising` to `porn_ad`. It exits non-zero if any item fails, but still writes
+the full result file for retry and audit.
 
 `report` is the integrated Slack flow: it builds the same plain-text body as `list-unreported`, POSTs
 to `https://slack.com/api/chat.postMessage` with the bearer token, and flips `reported: true` on every

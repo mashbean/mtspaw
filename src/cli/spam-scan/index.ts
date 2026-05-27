@@ -9,6 +9,9 @@ import type {
   PendingArticle,
   PendingComment,
   PendingCommentCW,
+  SpamCleanPlanItem,
+  SpamCleanResult,
+  SpamCleanResultItem,
   SpammerOccurrence,
   Spammers,
   SpamPending,
@@ -23,6 +26,8 @@ import {
   prunedState,
   readCandidates,
   readChannels,
+  readCleanPlan,
+  readCleanResult,
   readPending,
   readSpammers,
   readState,
@@ -30,6 +35,7 @@ import {
   USERS_CAP,
   writeCandidates,
   writeCleanPlan,
+  writeCleanResult,
   writePending,
   writeSpammers,
   writeState,
@@ -125,6 +131,34 @@ const USER_STATE_QUERY = `
   }
 `
 
+const COMMUNITY_WATCH_REMOVE_COMMENT_MUTATION = `
+  mutation SpamScanCommunityWatchRemoveComment($input: CommunityWatchRemoveCommentInput!) {
+    communityWatchRemoveComment(input: $input) {
+      id
+      state
+      communityWatchAction {
+        uuid
+        createdAt
+      }
+    }
+  }
+`
+
+const COMMENT_LOOKUP_WITH_CW_QUERY = `
+  query SpamScanCommentLookupWithCW($input: NodeInput!) {
+    node(input: $input) {
+      ... on Comment {
+        id
+        state
+        communityWatchAction {
+          uuid
+          createdAt
+        }
+      }
+    }
+  }
+`
+
 const buildArticleCommentsQuery = (withCW: boolean) => {
   const cwSelection = withCW ? 'communityWatchAction { uuid createdAt }' : ''
   return `
@@ -187,21 +221,37 @@ const errorMentionsCw = (msg: string | null | undefined): boolean => {
 }
 
 const articleEdgesFromIcymi = (result: unknown): RawArticle[] => {
-  const edges = (result as { data?: { viewer?: { recommendation?: { icymi?: { edges?: { node: RawArticle }[] } } } } })
-    ?.data?.viewer?.recommendation?.icymi?.edges
+  const edges = (
+    result as {
+      data?: {
+        viewer?: {
+          recommendation?: { icymi?: { edges?: { node: RawArticle }[] } }
+        }
+      }
+    }
+  )?.data?.viewer?.recommendation?.icymi?.edges
   return edges?.map((e) => e.node) ?? []
 }
 
 const articleEdgesFromHottest = (result: unknown): RawArticle[] => {
   const edges = (
-    result as { data?: { viewer?: { recommendation?: { hottest?: { edges?: { node: RawArticle }[] } } } } }
+    result as {
+      data?: {
+        viewer?: {
+          recommendation?: { hottest?: { edges?: { node: RawArticle }[] } }
+        }
+      }
+    }
   )?.data?.viewer?.recommendation?.hottest?.edges
   return edges?.map((e) => e.node) ?? []
 }
 
 const articleEdgesFromChannel = (result: unknown): RawArticle[] => {
-  const edges = (result as { data?: { channel?: { articles?: { edges?: { node: RawArticle }[] } } } })?.data?.channel
-    ?.articles?.edges
+  const edges = (
+    result as {
+      data?: { channel?: { articles?: { edges?: { node: RawArticle }[] } } }
+    }
+  )?.data?.channel?.articles?.edges
   return edges?.map((e) => e.node) ?? []
 }
 
@@ -271,8 +321,11 @@ const fetchArticleComments = async (
     return { comments: [], cwUnsupported: false }
   }
 
-  const edges = (result as { data?: { article?: { comments?: { edges?: { node: RawComment }[] } } } })?.data?.article
-    ?.comments?.edges
+  const edges = (
+    result as {
+      data?: { article?: { comments?: { edges?: { node: RawComment }[] } } }
+    }
+  )?.data?.article?.comments?.edges
   return { comments: edges?.map((e) => e.node) ?? [], cwUnsupported: false }
 }
 
@@ -300,7 +353,13 @@ const flattenComments = (raw: RawComment[], cutoffMs: number): PendingComment[] 
     if (!cw && isCommentBenign(content)) {
       return
     }
-    const entry: PendingComment = { commentId: id, content, author, depth, communityWatchAction: cw }
+    const entry: PendingComment = {
+      commentId: id,
+      content,
+      author,
+      depth,
+      communityWatchAction: cw,
+    }
     if (parentCommentId) {
       entry.parentCommentId = parentCommentId
     }
@@ -505,7 +564,11 @@ const recordCommand = new Command('record')
           lastSeenAt: now,
           occurrences: [occurrence],
           reported: false,
-          communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+          communityWatchHistory: {
+            seen: false,
+            lastUuid: null,
+            lastSeenAt: null,
+          },
         }
         const names = Object.keys(spammers.users)
         if (names.length > USERS_CAP) {
@@ -538,7 +601,12 @@ const markScannedCommand = new Command('mark-scanned')
     const state = prunedState(readState())
     const idx = state.articles.findIndex((a) => a.articleId === articleId)
     if (idx >= 0) {
-      state.articles[idx] = { articleId, shortHash, lastScannedAt: now, spam }
+      state.articles[idx] = {
+        articleId,
+        shortHash,
+        lastScannedAt: now,
+        spam,
+      }
     } else {
       state.articles.push({ articleId, shortHash, lastScannedAt: now, spam })
     }
@@ -596,6 +664,239 @@ const planCleanCommand = new Command('plan-clean')
     writeCleanPlan(plan)
   })
 
+const COMMUNITY_WATCH_REMOVE_INTERVAL_MS = 1000
+
+type CommunityWatchRemoveReason = 'porn_ad' | 'spam_ad'
+
+const toCommunityWatchRemoveReason = (reason: string): CommunityWatchRemoveReason => {
+  return reason === 'pornographic_advertising' ? 'porn_ad' : 'spam_ad'
+}
+
+const parsePositiveInteger = (value: string | undefined, label: string): number | null => {
+  if (value === undefined) {
+    return null
+  }
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    console.error(`${label} must be a positive integer`)
+    process.exit(1)
+  }
+  return parsed
+}
+
+const hasCommunityWatchFeature = (envJson: Record<string, unknown>): boolean => {
+  const features = envJson.features
+  if (!features || typeof features !== 'object') {
+    return false
+  }
+  const flags = features as Record<string, unknown>
+  return flags.community_watch === true || flags.communityWatch === true
+}
+
+const toSkippedCleanResultItem = (
+  item: SpamCleanPlanItem,
+  error: string,
+  action?: { uuid?: string; createdAt?: string } | null,
+): SpamCleanResultItem => ({
+  commentId: item.commentId,
+  shortHash: item.shortHash,
+  author: item.author,
+  reason: item.reason,
+  status: 'skipped',
+  uuid: action?.uuid,
+  createdAt: action?.createdAt,
+  error,
+})
+
+const submitCleanCommand = new Command('submit-clean')
+  .description('Submit spam-clean-plan.json through communityWatchRemoveComment')
+  .option('--execute', 'Actually remove comments; without this flag only writes a dry-run result')
+  .option('--limit <number>', 'Submit at most this many plan items')
+  .option('--intervalMs <number>', 'Delay between Community Watch mutations', `${COMMUNITY_WATCH_REMOVE_INTERVAL_MS}`)
+  .action(async (opts: { execute?: boolean; limit?: string; intervalMs?: string }) => {
+    const execute = !!opts.execute
+    const limit = parsePositiveInteger(opts.limit, '--limit')
+    const intervalMs = parsePositiveInteger(opts.intervalMs, '--intervalMs') ?? COMMUNITY_WATCH_REMOVE_INTERVAL_MS
+    const cleanPlan = readCleanPlan()
+    const items = limit ? cleanPlan.items.slice(0, limit) : cleanPlan.items
+    if (items.length === 0) {
+      const result: SpamCleanResult = {
+        generatedAt: new Date().toISOString(),
+        sourceGeneratedAt: cleanPlan.sourceGeneratedAt,
+        execute,
+        total: 0,
+        removed: 0,
+        failed: 0,
+        skipped: 0,
+        dryRun: 0,
+        items: [],
+      }
+      writeCleanResult(result)
+      console.log('spam-scan submit-clean: no comments planned')
+      return
+    }
+
+    if (!execute) {
+      const resultItems: SpamCleanResultItem[] = items.map((item) => ({
+        commentId: item.commentId,
+        shortHash: item.shortHash,
+        author: item.author,
+        reason: item.reason,
+        status: 'dry_run',
+      }))
+      writeCleanResult({
+        generatedAt: new Date().toISOString(),
+        sourceGeneratedAt: cleanPlan.sourceGeneratedAt,
+        execute: false,
+        total: resultItems.length,
+        removed: 0,
+        failed: 0,
+        skipped: 0,
+        dryRun: resultItems.length,
+        items: resultItems,
+      })
+      console.log(
+        `spam-scan submit-clean dry-run: ${resultItems.length} comments planned; rerun with --execute to remove`,
+      )
+      return
+    }
+
+    const envJsonPath = requireEnvJson()
+    const envJson = readEnvJson(envJsonPath)
+    if (!hasCommunityWatchFeature(envJson)) {
+      console.error('Feature community_watch is not enabled in env.json')
+      process.exit(1)
+    }
+    const mattersApi = requireMattersApi(envJson)
+    const previousResult = readCleanResult()
+    const previouslyRemoved = new Set(
+      previousResult.items.filter((item) => item.status === 'removed').map((item) => item.commentId),
+    )
+    const resultItems: SpamCleanResultItem[] = []
+    let mutationCount = 0
+
+    for (let i = 0; i < items.length; i += 1) {
+      const item = items[i]
+
+      if (previouslyRemoved.has(item.commentId)) {
+        resultItems.push(toSkippedCleanResultItem(item, 'Already removed in previous spam-clean-result.json'))
+        continue
+      }
+
+      const lookup = await fetchGqlWithAuthRetry(envJsonPath, mattersApi, COMMENT_LOOKUP_WITH_CW_QUERY, {
+        input: { id: item.commentId },
+      })
+      if (lookup.errorMessage) {
+        resultItems.push({
+          commentId: item.commentId,
+          shortHash: item.shortHash,
+          author: item.author,
+          reason: item.reason,
+          status: 'failed',
+          error: `Comment lookup failed: ${lookup.errorMessage}`,
+        })
+        console.error(`submit-clean lookup failed: ${item.shortHash} ${item.commentId}: ${lookup.errorMessage}`)
+        continue
+      }
+      const target = (
+        lookup.result as {
+          data?: {
+            node?: {
+              id?: string
+              state?: string
+              communityWatchAction?: {
+                uuid?: string
+                createdAt?: string
+              } | null
+            } | null
+          }
+        }
+      )?.data?.node
+      if (!target?.id) {
+        resultItems.push(toSkippedCleanResultItem(item, `Comment not found: ${item.commentId}`))
+        continue
+      }
+      if (target.state !== 'active') {
+        resultItems.push(toSkippedCleanResultItem(item, `Comment is not active (state: ${target.state ?? 'unknown'})`))
+        continue
+      }
+      if (target.communityWatchAction?.uuid) {
+        resultItems.push(
+          toSkippedCleanResultItem(item, 'Comment already has a Community Watch action', target.communityWatchAction),
+        )
+        continue
+      }
+
+      if (mutationCount > 0) {
+        await delay(intervalMs)
+      }
+      const { result, errorMessage } = await fetchGqlWithAuthRetry(
+        envJsonPath,
+        mattersApi,
+        COMMUNITY_WATCH_REMOVE_COMMENT_MUTATION,
+        {
+          input: {
+            id: item.commentId,
+            reason: toCommunityWatchRemoveReason(item.reason),
+          },
+        },
+      )
+      mutationCount += 1
+      if (errorMessage) {
+        resultItems.push({
+          commentId: item.commentId,
+          shortHash: item.shortHash,
+          author: item.author,
+          reason: item.reason,
+          status: 'failed',
+          error: errorMessage,
+        })
+        console.error(`submit-clean failed: ${item.shortHash} ${item.commentId}: ${errorMessage}`)
+        continue
+      }
+      const action = (
+        result as {
+          data?: {
+            communityWatchRemoveComment?: {
+              communityWatchAction?: {
+                uuid?: string
+                createdAt?: string
+              } | null
+            }
+          }
+        }
+      )?.data?.communityWatchRemoveComment?.communityWatchAction
+      resultItems.push({
+        commentId: item.commentId,
+        shortHash: item.shortHash,
+        author: item.author,
+        reason: item.reason,
+        status: 'removed',
+        uuid: action?.uuid,
+        createdAt: action?.createdAt,
+      })
+    }
+
+    const removed = resultItems.filter((item) => item.status === 'removed').length
+    const failed = resultItems.filter((item) => item.status === 'failed').length
+    const skipped = resultItems.filter((item) => item.status === 'skipped').length
+    writeCleanResult({
+      generatedAt: new Date().toISOString(),
+      sourceGeneratedAt: cleanPlan.sourceGeneratedAt,
+      execute: true,
+      total: resultItems.length,
+      removed,
+      failed,
+      skipped,
+      dryRun: 0,
+      items: resultItems,
+    })
+    console.log(`spam-scan submit-clean: removed ${removed}, skipped ${skipped}, failed ${failed}`)
+    if (failed > 0) {
+      process.exit(1)
+    }
+  })
+
 const noteCwCommand = new Command('note-cw')
   .description('Update communityWatchHistory on existing spammer; no-op when user not in roster')
   .option('--userName <name>', 'Spammer userName')
@@ -612,7 +913,11 @@ const noteCwCommand = new Command('note-cw')
       console.log(`note-cw: ${userName} not in roster, no-op`)
       return
     }
-    user.communityWatchHistory = { seen: true, lastUuid: uuid, lastSeenAt: createdAt }
+    user.communityWatchHistory = {
+      seen: true,
+      lastUuid: uuid,
+      lastSeenAt: createdAt,
+    }
     writeSpammers(spammers)
     console.log(`note-cw: updated CW history for @${userName}`)
   })
@@ -638,8 +943,14 @@ interface UserStateResult {
 }
 
 const fetchUserState = async (mattersApi: string, userName: string): Promise<UserStateResult> => {
-  const result = (await fetchGql(mattersApi, USER_STATE_QUERY, { input: { userName } })) as {
-    data?: { user?: { status?: { state?: 'active' | 'banned' | 'archived' | 'frozen' } } | null }
+  const result = (await fetchGql(mattersApi, USER_STATE_QUERY, {
+    input: { userName },
+  })) as {
+    data?: {
+      user?: {
+        status?: { state?: 'active' | 'banned' | 'archived' | 'frozen' }
+      } | null
+    }
     errors?: { message: string }[]
   }
   const errorMessage = formatGqlErrors(result)
@@ -827,10 +1138,19 @@ spamScanCommand.addCommand(recordCommand)
 spamScanCommand.addCommand(markScannedCommand)
 spamScanCommand.addCommand(clusterCommand)
 spamScanCommand.addCommand(planCleanCommand)
+spamScanCommand.addCommand(submitCleanCommand)
 spamScanCommand.addCommand(noteCwCommand)
 spamScanCommand.addCommand(listUnreportedCommand)
 spamScanCommand.addCommand(markReportedCommand)
 spamScanCommand.addCommand(reportCommand)
 spamScanCommand.addCommand(cleanupCommand)
 
-export { buildArticleCommentsQuery, CHANNEL_QUERY, HOTTEST_QUERY, ICYMI_QUERY, spamScanCommand, USER_STATE_QUERY }
+export {
+  buildArticleCommentsQuery,
+  CHANNEL_QUERY,
+  COMMUNITY_WATCH_REMOVE_COMMENT_MUTATION,
+  HOTTEST_QUERY,
+  ICYMI_QUERY,
+  spamScanCommand,
+  USER_STATE_QUERY,
+}

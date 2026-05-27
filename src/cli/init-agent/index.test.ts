@@ -67,6 +67,10 @@ describe('init-agent command', () => {
       '/test/sandbox/workspace/test-agent/env.json',
       expect.stringContaining('"comment_reply"'),
     )
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+      '/test/sandbox/workspace/test-agent/env.json',
+      expect.stringContaining('"community_watch"'),
+    )
   })
 
   it('creates workspace, copies playbooks and AGENTS.md when they do not exist', async () => {
