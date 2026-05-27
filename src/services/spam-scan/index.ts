@@ -101,6 +101,30 @@ interface SpamCleanPlan {
   items: SpamCleanPlanItem[]
 }
 
+type SpamCleanResultStatus = 'dry_run' | 'removed' | 'failed'
+
+interface SpamCleanResultItem {
+  commentId: string
+  shortHash: string
+  author: AuthorRef
+  reason: CommunityWatchSpamReason
+  status: SpamCleanResultStatus
+  uuid?: string
+  createdAt?: string
+  error?: string
+}
+
+interface SpamCleanResult {
+  generatedAt: string
+  sourceGeneratedAt: string
+  execute: boolean
+  total: number
+  removed: number
+  failed: number
+  dryRun: number
+  items: SpamCleanResultItem[]
+}
+
 interface SpammerOccurrence {
   type: 'article' | 'comment'
   contentId: string
@@ -137,6 +161,7 @@ const statePath = () => path.resolve(process.cwd(), 'spam-scan-state.json')
 const pendingPath = () => path.resolve(process.cwd(), 'spam-pending.json')
 const candidatesPath = () => path.resolve(process.cwd(), 'spam-candidates.json')
 const cleanPlanPath = () => path.resolve(process.cwd(), 'spam-clean-plan.json')
+const cleanResultPath = () => path.resolve(process.cwd(), 'spam-clean-result.json')
 const spammersPath = () => path.resolve(process.cwd(), 'spammers.json')
 
 const readChannels = (): SpamScanChannels => {
@@ -195,6 +220,23 @@ const readCandidates = (): SpamCandidates => {
 
 const writeCleanPlan = (data: SpamCleanPlan) => {
   fs.writeFileSync(cleanPlanPath(), JSON.stringify(data, null, 2))
+}
+
+const readCleanPlan = (): SpamCleanPlan => {
+  const p = cleanPlanPath()
+  if (!fs.existsSync(p)) {
+    return {
+      generatedAt: '',
+      sourceGeneratedAt: '',
+      dryRunOnly: true,
+      items: [],
+    }
+  }
+  return JSON.parse(fs.readFileSync(p, 'utf-8'))
+}
+
+const writeCleanResult = (data: SpamCleanResult) => {
+  fs.writeFileSync(cleanResultPath(), JSON.stringify(data, null, 2))
 }
 
 const readSpammers = (): Spammers => {
@@ -427,7 +469,10 @@ const formatUnreportedReport = (users: Record<string, SpammerUser>): { text: str
     }
     lines.push('')
   }
-  return { text: lines.join('\n').replace(/\n+$/, ''), userNames: entries.map(([n]) => n) }
+  return {
+    text: lines.join('\n').replace(/\n+$/, ''),
+    userNames: entries.map(([n]) => n),
+  }
 }
 
 export {
@@ -436,6 +481,7 @@ export {
   candidatesPath,
   channelsPath,
   cleanPlanPath,
+  cleanResultPath,
   formatUnreportedReport,
   isCommentBenign,
   OCCURRENCES_CAP,
@@ -443,6 +489,7 @@ export {
   prunedState,
   readCandidates,
   readChannels,
+  readCleanPlan,
   readPending,
   readSpammers,
   readState,
@@ -453,6 +500,7 @@ export {
   USERS_CAP,
   writeCandidates,
   writeCleanPlan,
+  writeCleanResult,
   writePending,
   writeSpammers,
   writeState,
@@ -470,6 +518,9 @@ export type {
   SpamCandidates,
   SpamCleanPlan,
   SpamCleanPlanItem,
+  SpamCleanResult,
+  SpamCleanResultItem,
+  SpamCleanResultStatus,
   SpammerOccurrence,
   Spammers,
   SpammerUser,

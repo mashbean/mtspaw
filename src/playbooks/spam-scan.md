@@ -25,6 +25,11 @@ Version: 0.8
 2-2. Run `mtspaw spam-scan plan-clean` to write spam-clean-plan.json.
     This is dry-run only. Review the planned comment ids before any future Community Watch action.
 
+2-3. If spam-clean-plan.json contains high-confidence repeated comments and a human operator approves
+    the list, run `mtspaw spam-scan submit-clean --execute` to submit those comments through
+    `communityWatchRemoveComment`. Without `--execute`, this command only writes spam-clean-result.json
+    as a dry-run preview. After execution, inspect spam-clean-result.json before continuing.
+
 3. Read spam-pending.json
     3-1. If the file does not exist or its `articles` array is empty then skip directly to Step 6
         so cleanup and report still run for any unreported spammers from a previous cycle.

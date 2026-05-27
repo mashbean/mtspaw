@@ -56,6 +56,7 @@ const statePath = `${process.cwd()}/spam-scan-state.json`
 const pendingPath = `${process.cwd()}/spam-pending.json`
 const candidatesPath = `${process.cwd()}/spam-candidates.json`
 const cleanPlanPath = `${process.cwd()}/spam-clean-plan.json`
+const cleanResultPath = `${process.cwd()}/spam-clean-result.json`
 const spammersPath = `${process.cwd()}/spammers.json`
 
 const setFile = (p: string, value: unknown) => {
@@ -111,7 +112,11 @@ describe('spam-scan query command', () => {
                         shortHash: 'ah1',
                         title: 'A1',
                         state: 'active',
-                        author: { id: 'User:u1', userName: 'alice', displayName: 'Alice' },
+                        author: {
+                          id: 'User:u1',
+                          userName: 'alice',
+                          displayName: 'Alice',
+                        },
                         contents: { html: '<p>body</p>' },
                       },
                     },
@@ -124,7 +129,13 @@ describe('spam-scan query command', () => {
         errorMessage: null,
       })
       .mockResolvedValueOnce({
-        result: { errors: [{ message: 'Cannot query field "communityWatchAction" on type "Comment"' }] },
+        result: {
+          errors: [
+            {
+              message: 'Cannot query field "communityWatchAction" on type "Comment"',
+            },
+          ],
+        },
         errorMessage: 'Cannot query field "communityWatchAction" on type "Comment"',
       })
       .mockResolvedValueOnce({
@@ -139,7 +150,11 @@ describe('spam-scan query command', () => {
                       state: 'active',
                       content: '<p>hello</p>',
                       createdAt: '2026-05-15T11:00:00.000Z',
-                      author: { id: 'User:u2', userName: 'bob', displayName: 'Bob' },
+                      author: {
+                        id: 'User:u2',
+                        userName: 'bob',
+                        displayName: 'Bob',
+                      },
                       comments: { edges: [] },
                     },
                   },
@@ -157,7 +172,9 @@ describe('spam-scan query command', () => {
     expect(calls[1][2]).toContain('communityWatchAction')
     expect(calls[2][2]).not.toContain('communityWatchAction')
 
-    const pending = readFile(pendingPath) as { articles: { articleId: string; comments: { content: string }[] }[] }
+    const pending = readFile(pendingPath) as {
+      articles: { articleId: string; comments: { content: string }[] }[]
+    }
     expect(pending.articles).toHaveLength(1)
     expect(pending.articles[0].articleId).toBe('Article:a1')
     expect(pending.articles[0].comments[0].content).toBe('hello')
@@ -167,8 +184,18 @@ describe('spam-scan query command', () => {
     setFile(channelsPath, { feeds: [{ type: 'icymi' }] })
     setFile(statePath, {
       articles: [
-        { articleId: 'Article:spam', shortHash: 'sh', lastScannedAt: '2026-05-15T10:00:00.000Z', spam: true },
-        { articleId: 'Article:keep', shortHash: 'kh', lastScannedAt: '2026-05-15T10:00:00.000Z', spam: false },
+        {
+          articleId: 'Article:spam',
+          shortHash: 'sh',
+          lastScannedAt: '2026-05-15T10:00:00.000Z',
+          spam: true,
+        },
+        {
+          articleId: 'Article:keep',
+          shortHash: 'kh',
+          lastScannedAt: '2026-05-15T10:00:00.000Z',
+          spam: false,
+        },
       ],
     })
 
@@ -186,7 +213,11 @@ describe('spam-scan query command', () => {
                         shortHash: 'sh',
                         title: 'spam',
                         state: 'active',
-                        author: { id: 'User:u1', userName: 'alice', displayName: 'Alice' },
+                        author: {
+                          id: 'User:u1',
+                          userName: 'alice',
+                          displayName: 'Alice',
+                        },
                         contents: { html: '' },
                       },
                     },
@@ -196,7 +227,11 @@ describe('spam-scan query command', () => {
                         shortHash: 'kh',
                         title: 'keep',
                         state: 'active',
-                        author: { id: 'User:u2', userName: 'bob', displayName: 'Bob' },
+                        author: {
+                          id: 'User:u2',
+                          userName: 'bob',
+                          displayName: 'Bob',
+                        },
                         contents: { html: '' },
                       },
                     },
@@ -220,7 +255,11 @@ describe('spam-scan query command', () => {
                       state: 'active',
                       content: '<p>old comment text</p>',
                       createdAt: '2026-05-15T09:00:00.000Z',
-                      author: { id: 'User:x', userName: 'eve', displayName: 'Eve' },
+                      author: {
+                        id: 'User:x',
+                        userName: 'eve',
+                        displayName: 'Eve',
+                      },
                       communityWatchAction: null,
                       comments: { edges: [] },
                     },
@@ -231,7 +270,11 @@ describe('spam-scan query command', () => {
                       state: 'active',
                       content: '<p>new comment text</p>',
                       createdAt: '2026-05-15T11:00:00.000Z',
-                      author: { id: 'User:y', userName: 'mallory', displayName: 'Mallory' },
+                      author: {
+                        id: 'User:y',
+                        userName: 'mallory',
+                        displayName: 'Mallory',
+                      },
                       communityWatchAction: null,
                       comments: { edges: [] },
                     },
@@ -281,7 +324,11 @@ describe('spam-scan query command', () => {
                         shortHash: 'ah1',
                         title: 'A1 title',
                         state: 'active',
-                        author: { id: 'User:u1', userName: 'alice', displayName: 'Alice' },
+                        author: {
+                          id: 'User:u1',
+                          userName: 'alice',
+                          displayName: 'Alice',
+                        },
                         contents: { html: '<p>body</p>' },
                       },
                     },
@@ -305,7 +352,11 @@ describe('spam-scan query command', () => {
                       state: 'active',
                       content: '<p>hi there reader</p>',
                       createdAt: '2026-05-15T11:00:00.000Z',
-                      author: { id: 'User:u2', userName: 'bob', displayName: 'Bob' },
+                      author: {
+                        id: 'User:u2',
+                        userName: 'bob',
+                        displayName: 'Bob',
+                      },
                       communityWatchAction: null,
                       comments: { edges: [] },
                     },
@@ -353,12 +404,20 @@ describe('spam-scan cluster command', () => {
         shortHash: `sh${n}`,
         title: `Article ${n}`,
         needsArticleJudgement: false,
-        author: { userId: `User:a${n}`, userName: `author${n}`, displayName: `Author ${n}` },
+        author: {
+          userId: `User:a${n}`,
+          userName: `author${n}`,
+          displayName: `Author ${n}`,
+        },
         comments: [
           {
             commentId: `Comment:c${n}`,
             content: '重複廣告請看 https://spam.example/path',
-            author: { userId: 'User:s', userName: 'spammer', displayName: 'Spammer' },
+            author: {
+              userId: 'User:s',
+              userName: 'spammer',
+              displayName: 'Spammer',
+            },
             depth: 'top',
             communityWatchAction: null,
           },
@@ -369,7 +428,11 @@ describe('spam-scan cluster command', () => {
     await spamScanCommand.parseAsync(['cluster'], { from: 'user' })
 
     const candidates = readFile(candidatesPath) as {
-      candidates: { fingerprint: string; articleSpread: number; commentCount: number }[]
+      candidates: {
+        fingerprint: string
+        articleSpread: number
+        commentCount: number
+      }[]
     }
     expect(candidates.candidates).toHaveLength(1)
     expect(candidates.candidates[0]).toMatchObject({
@@ -382,15 +445,19 @@ describe('spam-scan cluster command', () => {
   it('does not write candidates in dry-run mode', async () => {
     setFile(pendingPath, { articles: [] })
 
-    await spamScanCommand.parseAsync(['cluster', '--dry-run'], { from: 'user' })
+    await spamScanCommand.parseAsync(['cluster', '--dry-run'], {
+      from: 'user',
+    })
 
     expect(readFile(candidatesPath)).toBeNull()
   })
 
   it('rejects article spread below 2', async () => {
-    await expect(spamScanCommand.parseAsync(['cluster', '--minArticleSpread', '1'], { from: 'user' })).rejects.toThrow(
-      'process.exit',
-    )
+    await expect(
+      spamScanCommand.parseAsync(['cluster', '--minArticleSpread', '1'], {
+        from: 'user',
+      }),
+    ).rejects.toThrow('process.exit')
     expect(console.error).toHaveBeenCalledWith('--minArticleSpread must be an integer >= 2')
   })
 })
@@ -429,7 +496,11 @@ describe('spam-scan plan-clean command', () => {
               shortHash: 'sh1',
               title: 'Article 1',
               commentId: 'Comment:c1',
-              author: { userId: 'User:s', userName: 'spammer', displayName: 'Spammer' },
+              author: {
+                userId: 'User:s',
+                userName: 'spammer',
+                displayName: 'Spammer',
+              },
               content: 'spam https://spam.example',
             },
           ],
@@ -445,7 +516,168 @@ describe('spam-scan plan-clean command', () => {
     }
     expect(plan.dryRunOnly).toBe(true)
     expect(plan.items).toHaveLength(1)
-    expect(plan.items[0]).toMatchObject({ commentId: 'Comment:c1', reasonLabel: '濫發廣告', shortHash: 'sh1' })
+    expect(plan.items[0]).toMatchObject({
+      commentId: 'Comment:c1',
+      reasonLabel: '濫發廣告',
+      shortHash: 'sh1',
+    })
+  })
+})
+
+describe('spam-scan submit-clean command', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    fsStore.clear()
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit')
+    })
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-23T02:00:00.000Z'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  const seedCleanPlan = () => {
+    setFile(cleanPlanPath, {
+      generatedAt: '2026-05-23T01:00:00.000Z',
+      sourceGeneratedAt: '2026-05-23T00:00:00.000Z',
+      dryRunOnly: true,
+      items: [
+        {
+          commentId: 'Comment:c1',
+          articleId: 'Article:a1',
+          shortHash: 'sh1',
+          title: 'Article 1',
+          author: {
+            userId: 'User:s',
+            userName: 'spammer',
+            displayName: 'Spammer',
+          },
+          content: 'spam https://spam.example',
+          fingerprint: 'spammer:domain:spam.example',
+          reason: 'flood_advertising',
+          reasonLabel: '濫發廣告',
+        },
+      ],
+    })
+  }
+
+  it('writes a dry-run result without calling the API by default', async () => {
+    seedCleanPlan()
+
+    await spamScanCommand.parseAsync(['submit-clean'], { from: 'user' })
+
+    expect(fetchGqlWithAuthRetry).not.toHaveBeenCalled()
+    const result = readFile(cleanResultPath) as {
+      execute: boolean
+      dryRun: number
+      items: { commentId: string; status: string }[]
+    }
+    expect(result.execute).toBe(false)
+    expect(result.dryRun).toBe(1)
+    expect(result.items[0]).toMatchObject({
+      commentId: 'Comment:c1',
+      status: 'dry_run',
+    })
+  })
+
+  it('submits planned comments with communityWatchRemoveComment when executed', async () => {
+    seedCleanPlan()
+    vi.mocked(fetchGqlWithAuthRetry).mockResolvedValueOnce({
+      result: {
+        data: {
+          communityWatchRemoveComment: {
+            id: 'Comment:c1',
+            state: 'banned',
+            communityWatchAction: {
+              uuid: 'cw-1',
+              createdAt: '2026-05-23T02:00:00.000Z',
+            },
+          },
+        },
+      },
+      errorMessage: null,
+    })
+
+    await spamScanCommand.parseAsync(['submit-clean', '--execute'], {
+      from: 'user',
+    })
+
+    expect(fetchGqlWithAuthRetry).toHaveBeenCalledTimes(1)
+    const call = vi.mocked(fetchGqlWithAuthRetry).mock.calls[0]
+    expect(call[2]).toContain('communityWatchRemoveComment')
+    expect(call[3]).toEqual({ input: { id: 'Comment:c1', reason: 'spam_ad' } })
+    const result = readFile(cleanResultPath) as {
+      execute: boolean
+      removed: number
+      items: { commentId: string; status: string; uuid: string }[]
+    }
+    expect(result.execute).toBe(true)
+    expect(result.removed).toBe(1)
+    expect(result.items[0]).toMatchObject({
+      commentId: 'Comment:c1',
+      status: 'removed',
+      uuid: 'cw-1',
+    })
+  })
+
+  it('writes failures and exits non-zero when any mutation fails', async () => {
+    seedCleanPlan()
+    vi.mocked(fetchGqlWithAuthRetry).mockResolvedValueOnce({
+      result: {
+        errors: [{ message: 'viewer is not a Community Watch member' }],
+      },
+      errorMessage: 'viewer is not a Community Watch member',
+    })
+
+    await expect(
+      spamScanCommand.parseAsync(['submit-clean', '--execute'], {
+        from: 'user',
+      }),
+    ).rejects.toThrow('process.exit')
+
+    const result = readFile(cleanResultPath) as {
+      failed: number
+      items: { status: string; error: string }[]
+    }
+    expect(result.failed).toBe(1)
+    expect(result.items[0]).toMatchObject({
+      status: 'failed',
+      error: 'viewer is not a Community Watch member',
+    })
+  })
+
+  it('respects --limit and delays between executed mutations', async () => {
+    seedCleanPlan()
+    const plan = readFile(cleanPlanPath) as { items: unknown[] }
+    setFile(cleanPlanPath, {
+      ...plan,
+      items: [...plan.items, { ...(plan.items[0] as object), commentId: 'Comment:c2' }],
+    })
+    vi.mocked(fetchGqlWithAuthRetry).mockResolvedValue({
+      result: {
+        data: {
+          communityWatchRemoveComment: {
+            id: 'Comment:c1',
+            state: 'banned',
+            communityWatchAction: null,
+          },
+        },
+      },
+      errorMessage: null,
+    })
+
+    await spamScanCommand.parseAsync(['submit-clean', '--execute', '--limit', '2', '--intervalMs', '250'], {
+      from: 'user',
+    })
+
+    expect(fetchGqlWithAuthRetry).toHaveBeenCalledTimes(2)
+    expect(delay).toHaveBeenCalledWith(250)
   })
 })
 
@@ -485,7 +717,9 @@ describe('spam-scan record command', () => {
       { from: 'user' },
     )
 
-    const data = readFile(spammersPath) as { users: Record<string, { occurrences: unknown[]; reported: boolean }> }
+    const data = readFile(spammersPath) as {
+      users: Record<string, { occurrences: unknown[]; reported: boolean }>
+    }
     expect(data.users.alice.occurrences).toHaveLength(1)
     expect(data.users.alice.reported).toBe(false)
   })
@@ -505,7 +739,11 @@ describe('spam-scan record command', () => {
           lastSeenAt: '2026-05-01T09:00:00.000Z',
           occurrences: existingOccs,
           reported: false,
-          communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+          communityWatchHistory: {
+            seen: false,
+            lastUuid: null,
+            lastSeenAt: null,
+          },
         },
       },
     })
@@ -543,7 +781,11 @@ describe('spam-scan record command', () => {
           lastSeenAt: '2026-05-01T00:00:00.000Z',
           occurrences: [],
           reported: true,
-          communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+          communityWatchHistory: {
+            seen: false,
+            lastUuid: null,
+            lastSeenAt: null,
+          },
         },
       },
     })
@@ -553,7 +795,9 @@ describe('spam-scan record command', () => {
       { from: 'user' },
     )
 
-    const data = readFile(spammersPath) as { users: Record<string, { reported: boolean }> }
+    const data = readFile(spammersPath) as {
+      users: Record<string, { reported: boolean }>
+    }
     expect(data.users.alice.reported).toBe(false)
   })
 
@@ -566,7 +810,11 @@ describe('spam-scan record command', () => {
         lastSeenAt: `2026-05-01T${String(i).padStart(2, '0')}:00:00.000Z`,
         occurrences: [],
         reported: false,
-        communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+        communityWatchHistory: {
+          seen: false,
+          lastUuid: null,
+          lastSeenAt: null,
+        },
       }
     }
     setFile(spammersPath, { users: existing })
@@ -664,16 +912,28 @@ describe('spam-scan mark-scanned command', () => {
       from: 'user',
     })
 
-    const data = readFile(statePath) as { articles: { articleId: string; shortHash: string; spam: boolean }[] }
+    const data = readFile(statePath) as {
+      articles: { articleId: string; shortHash: string; spam: boolean }[]
+    }
     expect(data.articles).toEqual([
-      { articleId: 'Article:a1', shortHash: 'sh1', lastScannedAt: '2026-05-15T12:00:00.000Z', spam: false },
+      {
+        articleId: 'Article:a1',
+        shortHash: 'sh1',
+        lastScannedAt: '2026-05-15T12:00:00.000Z',
+        spam: false,
+      },
     ])
   })
 
   it('upserts existing entries and flips spam when --spam is supplied', async () => {
     setFile(statePath, {
       articles: [
-        { articleId: 'Article:a1', shortHash: 'sh-old', lastScannedAt: '2026-05-10T00:00:00.000Z', spam: false },
+        {
+          articleId: 'Article:a1',
+          shortHash: 'sh-old',
+          lastScannedAt: '2026-05-10T00:00:00.000Z',
+          spam: false,
+        },
       ],
     })
 
@@ -682,7 +942,12 @@ describe('spam-scan mark-scanned command', () => {
     })
 
     const data = readFile(statePath) as {
-      articles: { articleId: string; shortHash: string; spam: boolean; lastScannedAt: string }[]
+      articles: {
+        articleId: string
+        shortHash: string
+        spam: boolean
+        lastScannedAt: string
+      }[]
     }
     expect(data.articles).toHaveLength(1)
     expect(data.articles[0]).toEqual({
@@ -696,8 +961,18 @@ describe('spam-scan mark-scanned command', () => {
   it('prunes entries older than 7 days on write', async () => {
     setFile(statePath, {
       articles: [
-        { articleId: 'Article:old', shortHash: 'sho', lastScannedAt: '2026-05-01T00:00:00.000Z', spam: false },
-        { articleId: 'Article:keep', shortHash: 'shk', lastScannedAt: '2026-05-10T00:00:00.000Z', spam: false },
+        {
+          articleId: 'Article:old',
+          shortHash: 'sho',
+          lastScannedAt: '2026-05-01T00:00:00.000Z',
+          spam: false,
+        },
+        {
+          articleId: 'Article:keep',
+          shortHash: 'shk',
+          lastScannedAt: '2026-05-10T00:00:00.000Z',
+          spam: false,
+        },
       ],
     })
 
@@ -755,7 +1030,11 @@ describe('spam-scan note-cw command', () => {
           lastSeenAt: '2026-05-10T00:00:00.000Z',
           occurrences: [],
           reported: false,
-          communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+          communityWatchHistory: {
+            seen: false,
+            lastUuid: null,
+            lastSeenAt: null,
+          },
         },
       },
     })
@@ -768,7 +1047,13 @@ describe('spam-scan note-cw command', () => {
     const data = readFile(spammersPath) as {
       users: Record<
         string,
-        { communityWatchHistory: { seen: boolean; lastUuid: string | null; lastSeenAt: string | null } }
+        {
+          communityWatchHistory: {
+            seen: boolean
+            lastUuid: string | null
+            lastSeenAt: string | null
+          }
+        }
       >
     }
     expect(data.users.alice.communityWatchHistory).toEqual({
@@ -807,10 +1092,19 @@ describe('spam-scan list-unreported command', () => {
           firstSeenAt: '2026-05-10T00:00:00.000Z',
           lastSeenAt: '2026-05-15T00:00:00.000Z',
           occurrences: [
-            { type: 'comment', contentId: 'Comment:c1', shortHash: 'sh1', foundAt: '2026-05-15T00:00:00.000Z' },
+            {
+              type: 'comment',
+              contentId: 'Comment:c1',
+              shortHash: 'sh1',
+              foundAt: '2026-05-15T00:00:00.000Z',
+            },
           ],
           reported: false,
-          communityWatchHistory: { seen: true, lastUuid: 'u-1', lastSeenAt: '2026-05-15T10:00:00.000Z' },
+          communityWatchHistory: {
+            seen: true,
+            lastUuid: 'u-1',
+            lastSeenAt: '2026-05-15T10:00:00.000Z',
+          },
         },
         skipme: {
           displayName: 'Skipped',
@@ -818,7 +1112,11 @@ describe('spam-scan list-unreported command', () => {
           lastSeenAt: '2026-05-15T00:00:00.000Z',
           occurrences: [],
           reported: true,
-          communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+          communityWatchHistory: {
+            seen: false,
+            lastUuid: null,
+            lastSeenAt: null,
+          },
         },
       },
     })
@@ -852,7 +1150,11 @@ describe('spam-scan list-unreported command', () => {
             },
           ],
           reported: false,
-          communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+          communityWatchHistory: {
+            seen: false,
+            lastUuid: null,
+            lastSeenAt: null,
+          },
         },
       },
     })
@@ -877,7 +1179,11 @@ describe('spam-scan list-unreported command', () => {
             foundAt: `2026-05-1${i % 5}T00:00:00.000Z`,
           })),
           reported: false,
-          communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+          communityWatchHistory: {
+            seen: false,
+            lastUuid: null,
+            lastSeenAt: null,
+          },
         },
       },
     })
@@ -913,14 +1219,22 @@ describe('spam-scan mark-reported command', () => {
           lastSeenAt: 'x',
           occurrences: [],
           reported: false,
-          communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+          communityWatchHistory: {
+            seen: false,
+            lastUuid: null,
+            lastSeenAt: null,
+          },
         },
       },
     })
 
-    await spamScanCommand.parseAsync(['mark-reported', '--userName', 'alice'], { from: 'user' })
+    await spamScanCommand.parseAsync(['mark-reported', '--userName', 'alice'], {
+      from: 'user',
+    })
 
-    const data = readFile(spammersPath) as { users: Record<string, { reported: boolean }> }
+    const data = readFile(spammersPath) as {
+      users: Record<string, { reported: boolean }>
+    }
     expect(data.users.alice.reported).toBe(true)
   })
 
@@ -933,7 +1247,11 @@ describe('spam-scan mark-reported command', () => {
           lastSeenAt: 'x',
           occurrences: [],
           reported: false,
-          communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+          communityWatchHistory: {
+            seen: false,
+            lastUuid: null,
+            lastSeenAt: null,
+          },
         },
       },
     })
@@ -942,7 +1260,9 @@ describe('spam-scan mark-reported command', () => {
     await spamScanCommand.parseAsync(['mark-reported'], { from: 'user' })
 
     expect(input).toHaveBeenCalled()
-    const data = readFile(spammersPath) as { users: Record<string, { reported: boolean }> }
+    const data = readFile(spammersPath) as {
+      users: Record<string, { reported: boolean }>
+    }
     expect(data.users.alice.reported).toBe(true)
   })
 
@@ -955,7 +1275,11 @@ describe('spam-scan mark-reported command', () => {
           lastSeenAt: 'x',
           occurrences: [],
           reported: false,
-          communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+          communityWatchHistory: {
+            seen: false,
+            lastUuid: null,
+            lastSeenAt: null,
+          },
         },
         bob: {
           displayName: 'B',
@@ -963,7 +1287,11 @@ describe('spam-scan mark-reported command', () => {
           lastSeenAt: 'x',
           occurrences: [],
           reported: false,
-          communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+          communityWatchHistory: {
+            seen: false,
+            lastUuid: null,
+            lastSeenAt: null,
+          },
         },
         carol: {
           displayName: 'C',
@@ -971,14 +1299,22 @@ describe('spam-scan mark-reported command', () => {
           lastSeenAt: 'x',
           occurrences: [],
           reported: true,
-          communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+          communityWatchHistory: {
+            seen: false,
+            lastUuid: null,
+            lastSeenAt: null,
+          },
         },
       },
     })
 
-    await spamScanCommand.parseAsync(['mark-reported', '--all'], { from: 'user' })
+    await spamScanCommand.parseAsync(['mark-reported', '--all'], {
+      from: 'user',
+    })
 
-    const data = readFile(spammersPath) as { users: Record<string, { reported: boolean }> }
+    const data = readFile(spammersPath) as {
+      users: Record<string, { reported: boolean }>
+    }
     expect(data.users.alice.reported).toBe(true)
     expect(data.users.bob.reported).toBe(true)
     expect(data.users.carol.reported).toBe(true)
@@ -989,7 +1325,9 @@ describe('spam-scan mark-reported command', () => {
     setFile(spammersPath, { users: {} })
 
     await expect(
-      spamScanCommand.parseAsync(['mark-reported', '--userName', 'ghost'], { from: 'user' }),
+      spamScanCommand.parseAsync(['mark-reported', '--userName', 'ghost'], {
+        from: 'user',
+      }),
     ).rejects.toThrow('process.exit')
     expect(console.error).toHaveBeenCalledWith('user not found: ghost')
   })
@@ -1020,10 +1358,19 @@ describe('spam-scan report command', () => {
           firstSeenAt: '2026-05-10T00:00:00.000Z',
           lastSeenAt: '2026-05-15T00:00:00.000Z',
           occurrences: [
-            { type: 'comment', contentId: 'Comment:c1', shortHash: 'sh1', foundAt: '2026-05-15T00:00:00.000Z' },
+            {
+              type: 'comment',
+              contentId: 'Comment:c1',
+              shortHash: 'sh1',
+              foundAt: '2026-05-15T00:00:00.000Z',
+            },
           ],
           reported: false,
-          communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+          communityWatchHistory: {
+            seen: false,
+            lastUuid: null,
+            lastSeenAt: null,
+          },
         },
         bob: {
           displayName: 'Bob',
@@ -1031,14 +1378,21 @@ describe('spam-scan report command', () => {
           lastSeenAt: '2026-05-15T00:00:00.000Z',
           occurrences: [],
           reported: true,
-          communityWatchHistory: { seen: false, lastUuid: null, lastSeenAt: null },
+          communityWatchHistory: {
+            seen: false,
+            lastUuid: null,
+            lastSeenAt: null,
+          },
         },
       },
     })
   }
 
   it('aborts when slack.token is missing', async () => {
-    vi.mocked(readEnvJson).mockReturnValueOnce({ mattersApi: 'https://api.test', slack: { channel: '#x' } })
+    vi.mocked(readEnvJson).mockReturnValueOnce({
+      mattersApi: 'https://api.test',
+      slack: { channel: '#x' },
+    })
     seedUnreported()
 
     await expect(spamScanCommand.parseAsync(['report'], { from: 'user' })).rejects.toThrow('process.exit')
@@ -1046,7 +1400,10 @@ describe('spam-scan report command', () => {
   })
 
   it('aborts when slack.channel is missing', async () => {
-    vi.mocked(readEnvJson).mockReturnValueOnce({ mattersApi: 'https://api.test', slack: { token: 'xoxb-1' } })
+    vi.mocked(readEnvJson).mockReturnValueOnce({
+      mattersApi: 'https://api.test',
+      slack: { token: 'xoxb-1' },
+    })
     seedUnreported()
 
     await expect(spamScanCommand.parseAsync(['report'], { from: 'user' })).rejects.toThrow('process.exit')
@@ -1087,12 +1444,17 @@ describe('spam-scan report command', () => {
     expect(url).toBe('https://slack.com/api/chat.postMessage')
     const headers = init.headers as Record<string, string>
     expect(headers.Authorization).toBe('Bearer xoxb-1')
-    const body = JSON.parse(init.body as string) as { channel: string; text: string }
+    const body = JSON.parse(init.body as string) as {
+      channel: string
+      text: string
+    }
     expect(body.channel).toBe('C123')
     expect(body.text).toContain('<https://matters.town/@alice|@alice> (Alice)')
     expect(body.text).not.toContain('@bob')
 
-    const data = readFile(spammersPath) as { users: Record<string, { reported: boolean }> }
+    const data = readFile(spammersPath) as {
+      users: Record<string, { reported: boolean }>
+    }
     expect(data.users.alice.reported).toBe(true)
     expect(data.users.bob.reported).toBe(true)
   })
@@ -1112,7 +1474,9 @@ describe('spam-scan report command', () => {
     await expect(spamScanCommand.parseAsync(['report'], { from: 'user' })).rejects.toThrow('process.exit')
     expect(console.error).toHaveBeenCalledWith('slack send failed: channel_not_found')
 
-    const data = readFile(spammersPath) as { users: Record<string, { reported: boolean }> }
+    const data = readFile(spammersPath) as {
+      users: Record<string, { reported: boolean }>
+    }
     expect(data.users.alice.reported).toBe(false)
   })
 })
@@ -1153,11 +1517,19 @@ describe('spam-scan cleanup command', () => {
     })
 
     vi.mocked(fetchGql)
-      .mockResolvedValueOnce({ data: { user: { status: { state: 'active' } } } })
-      .mockResolvedValueOnce({ data: { user: { status: { state: 'archived' } } } })
-      .mockResolvedValueOnce({ data: { user: { status: { state: 'banned' } } } })
+      .mockResolvedValueOnce({
+        data: { user: { status: { state: 'active' } } },
+      })
+      .mockResolvedValueOnce({
+        data: { user: { status: { state: 'archived' } } },
+      })
+      .mockResolvedValueOnce({
+        data: { user: { status: { state: 'banned' } } },
+      })
       .mockResolvedValueOnce({ data: { user: null } })
-      .mockResolvedValueOnce({ data: { user: { status: { state: 'frozen' } } } })
+      .mockResolvedValueOnce({
+        data: { user: { status: { state: 'frozen' } } },
+      })
 
     await spamScanCommand.parseAsync(['cleanup'], { from: 'user' })
 
@@ -1171,7 +1543,9 @@ describe('spam-scan cleanup command', () => {
   it('keeps user when GraphQL returns errors', async () => {
     setFile(spammersPath, { users: { alice: makeUser() } })
 
-    vi.mocked(fetchGql).mockResolvedValueOnce({ errors: [{ message: 'transient' }] })
+    vi.mocked(fetchGql).mockResolvedValueOnce({
+      errors: [{ message: 'transient' }],
+    })
 
     await spamScanCommand.parseAsync(['cleanup'], { from: 'user' })
 
@@ -1189,7 +1563,9 @@ describe('spam-scan cleanup command', () => {
       },
     })
 
-    vi.mocked(fetchGql).mockResolvedValue({ data: { user: { status: { state: 'active' } } } })
+    vi.mocked(fetchGql).mockResolvedValue({
+      data: { user: { status: { state: 'active' } } },
+    })
 
     await spamScanCommand.parseAsync(['cleanup'], { from: 'user' })
 
